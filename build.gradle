@@ -1,5 +1,4 @@
 import com.github.spotbugs.snom.SpotBugsTask
-import java.text.SimpleDateFormat
 
 plugins {
     id 'checkstyle'
@@ -8,33 +7,12 @@ plugins {
     id 'java'
 }
 
-group = "com.crimsonwarpedcraft.exampleplugin"
+group = "fr.sukikui.biomemap"
+version = "1.0.0"
 
-static def getTime() {
-    SimpleDateFormat sdf = new SimpleDateFormat("yyMMdd-HHmm")
-    sdf.setTimeZone(TimeZone.getTimeZone("UTC"))
-    return sdf.format(new Date()).toString()
-}
-
-// Set version to version property if supplied
-String shortVersion = null
-if (hasProperty('ver')) {
-    if (ver.charAt(0) == "v") {
-        shortVersion = ver.substring(1).toUpperCase()
-    } else {
-        shortVersion = ver.toUpperCase()
-    }
-}
-
-// If the tag includes "-RC-" or no tag is supplied, append "-SNAPSHOT"
-int rcIdx
-if (shortVersion == null || shortVersion == "") {
-    version = getTime() + "-SNAPSHOT"
-} else if ((rcIdx = shortVersion.indexOf("-RC-")) != -1) {
-    version = shortVersion.substring(0, rcIdx) + "-SNAPSHOT"
-} else {
-    version = shortVersion
-}
+def paperApiVersion = '1.21.8-R0.1-SNAPSHOT'
+def hyphenIndex = paperApiVersion.indexOf('-')
+def minecraftVersion = hyphenIndex > 0 ? paperApiVersion.substring(0, hyphenIndex) : paperApiVersion
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -65,12 +43,13 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT'
+    compileOnly "io.papermc.paper:paper-api:${paperApiVersion}"
     compileOnly 'com.github.spotbugs:spotbugs-annotations:4.9.6'
     implementation 'io.papermc:paperlib:1.0.8'
+    implementation 'com.google.code.gson:gson:2.11.0'
     spotbugsPlugins 'com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0'
     testCompileOnly 'com.github.spotbugs:spotbugs-annotations:4.9.6'
-    testImplementation 'io.papermc.paper:paper-api:1.21.10-R0.1-SNAPSHOT'
+    testImplementation "io.papermc.paper:paper-api:${paperApiVersion}"
     testImplementation 'org.junit.jupiter:junit-jupiter:6.0.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.0.0'
 }
@@ -81,7 +60,14 @@ test {
 
 processResources {
     filesMatching("**/plugin.yml") {
-        expand ( NAME: rootProject.name, VERSION: version, PACKAGE: rootProject.group.toString() )
+        expand(
+                NAME: rootProject.name,
+                VERSION: version,
+                PACKAGE: rootProject.group.toString(),
+                AUTHOR: "Sukikui",
+                DESCRIPTION: "BiomeMap generates a lightweight JSON file mapping each world region to its dominant biome",
+                API_VERSION: minecraftVersion
+        )
     }
 }
 
