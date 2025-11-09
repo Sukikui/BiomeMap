@@ -10,7 +10,7 @@ plugins {
 group = "fr.sukikui.biomemap"
 version = "1.0.0"
 
-def paperApiVersion = '1.21.8-R0.1-SNAPSHOT'
+def paperApiVersion = '1.21.10-R0.1-SNAPSHOT'
 def hyphenIndex = paperApiVersion.indexOf('-')
 def minecraftVersion = hyphenIndex > 0 ? paperApiVersion.substring(0, hyphenIndex) : paperApiVersion
 
