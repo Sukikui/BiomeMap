@@ -35,20 +35,20 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-          modrinth-id: H8uMb3vr
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          modrinth-featured: true
+          # modrinth-id: H8uMb3vr
+          # modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          # modrinth-featured: true
 
           files: build/libs/!(*-@(dev|sources|javadoc)).jar
           version-type: release
-          loaders: |
-            paper
-            spigot 
-            purpur
+          # loaders: |
+          #   paper
+          #   spigot
+          #   purpur
 
-      - name: 📝 Sync Modrinth description from README
-        uses: funnyboy-roks/modrinth-auto-desc@v1.6
-        with:
-          auth-token: ${{ secrets.MODRINTH_TOKEN }}
-          slug: H8uMb3vr
-          readme: README.md
+      # - name: 📝 Sync Modrinth description from README
+      #   uses: funnyboy-roks/modrinth-auto-desc@v1.6
+      #   with:
+      #     auth-token: ${{ secrets.MODRINTH_TOKEN }}
+      #     slug: H8uMb3vr
+      #     readme: README.md
