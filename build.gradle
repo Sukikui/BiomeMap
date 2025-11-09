@@ -13,6 +13,7 @@ version = "0.1.0"
 def paperApiVersion = '1.21.8-R0.1-SNAPSHOT'
 def hyphenIndex = paperApiVersion.indexOf('-')
 def minecraftVersion = hyphenIndex > 0 ? paperApiVersion.substring(0, hyphenIndex) : paperApiVersion
+def archiveVersionLabel = "${version}+mc${minecraftVersion}"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -99,6 +100,8 @@ tasks.withType(SpotBugsTask).configureEach {
 }
 
 shadowJar {
+    archiveBaseName.set(rootProject.name)
+    archiveVersion.set(archiveVersionLabel)
     archiveClassifier.set('')
     relocate 'io.papermc.lib', 'shadow.io.papermc.paperlib'
     minimize()
@@ -122,7 +125,7 @@ tasks.register('release') {
             // Rename final JAR to trim off version information
             shadowJar.archiveFile.get().getAsFile()
                     .renameTo(layout.buildDirectory.get().toString() + File.separator + 'libs' + File.separator
-                            + rootProject.name + '.jar')
+                            + "${rootProject.name}-${archiveVersionLabel}.jar")
         }
     }
 }
