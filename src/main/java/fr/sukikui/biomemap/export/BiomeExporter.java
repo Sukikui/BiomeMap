@@ -30,11 +30,25 @@ public final class BiomeExporter {
   private final File pluginFolder;
   private final int scanRadius;
 
+  /**
+   * Creates a new exporter tied to the plugin data folder.
+   *
+   * @param pluginFolder location where exports will be saved
+   * @param scanRadius radius (in blocks) scanned around the spawn
+   */
   public BiomeExporter(File pluginFolder, int scanRadius) {
     this.pluginFolder = pluginFolder;
     this.scanRadius = scanRadius;
   }
 
+  /**
+   * Exports the dominant biome grid for the given world.
+   *
+   * @param world Paper world to sample
+   * @param cellSize width/height of each sampled cell
+   * @return metadata about the export output
+   * @throws IOException if the JSON file cannot be written
+   */
   public ExportResult exportWorld(World world, int cellSize) throws IOException {
     long start = System.currentTimeMillis();
     Location spawn = world.getSpawnLocation();
@@ -54,7 +68,8 @@ public final class BiomeExporter {
       }
     }
 
-    BiomeMapExport export = new BiomeMapExport(cellSize, new Origin(originX, originZ), width, height, cells);
+    BiomeMapExport export =
+        new BiomeMapExport(cellSize, new Origin(originX, originZ), width, height, cells);
     File outputFile = new File(pluginFolder, EXPORT_RELATIVE_PATH);
     writeExport(export, outputFile);
     long duration = System.currentTimeMillis() - start;
@@ -72,7 +87,8 @@ public final class BiomeExporter {
     }
   }
 
-  private String determineDominantBiome(World world, int cellOriginX, int cellOriginZ, int cellSize) {
+  private String determineDominantBiome(
+      World world, int cellOriginX, int cellOriginZ, int cellSize) {
     Map<String, Integer> counts = new HashMap<>();
     int[][] offsets = new int[][] {
         {cellSize / 2, cellSize / 2},
@@ -99,11 +115,14 @@ public final class BiomeExporter {
   }
 
   private String biomeKey(Biome biome) {
-    if (biome == null) return "minecraft:unknown";
+    if (biome == null) {
+      return "minecraft:unknown";
+    }
     NamespacedKey key = biome.getKey();
     return key.asString();
   }
 
+  /** Describes the result of a biome export run. */
   public record ExportResult(int cellCount, File outputFile, long durationMs) {
   }
 

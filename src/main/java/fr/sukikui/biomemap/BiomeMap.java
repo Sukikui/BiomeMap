@@ -17,7 +17,7 @@ public final class BiomeMap extends JavaPlugin {
   public static final int DEFAULT_CELL_SIZE = 32;
   public static final int SCAN_RADIUS = 5000;
 
-    @Override
+  @Override
   public void onEnable() {
     PaperLib.suggestPaper(this);
     ensureDataFolder();
@@ -28,7 +28,8 @@ public final class BiomeMap extends JavaPlugin {
 
     BiomeMapCommand commandHandler = new BiomeMapCommand(exporter, logger, DEFAULT_CELL_SIZE);
     PluginCommand biomemapCommand =
-        Objects.requireNonNull(getCommand("biomemap"), "Command biomemap not defined in plugin.yml");
+        Objects.requireNonNull(
+            getCommand("biomemap"), "Command biomemap not defined in plugin.yml");
     biomemapCommand.setExecutor(commandHandler);
     biomemapCommand.setTabCompleter(commandHandler);
   }
