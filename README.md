@@ -42,7 +42,7 @@ Typical console output:
 
 ## 🗺 JSON Format
 
-```jsonc
+```json
 {
   "cellSize": 32,
   "origin": { "x": -5000, "z": -5000 },
