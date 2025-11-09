@@ -1,5 +1,6 @@
 package fr.sukikui.biomemap.command;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import fr.sukikui.biomemap.export.BiomeExporter;
 import fr.sukikui.biomemap.export.BiomeExporter.ExportResult;
 import java.io.IOException;
@@ -19,6 +20,7 @@ import org.bukkit.command.TabCompleter;
 /**
  * Handles the /biomemap command registration, parsing, and tab completion.
  */
+@SuppressFBWarnings("EI_EXPOSE_REP2")
 public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
 
   private static final String DEFAULT_WORLD = "world";
@@ -27,12 +29,22 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
   private final Logger logger;
   private final int defaultCellSize;
 
+  /**
+   * Creates a handler bound to a {@link BiomeExporter}.
+   *
+   * @param exporter exporter that performs the heavy lifting
+   * @param logger plugin logger used for console output
+   * @param defaultCellSize fallback cell size when the user omits it
+   */
   public BiomeMapCommand(BiomeExporter exporter, Logger logger, int defaultCellSize) {
     this.exporter = exporter;
     this.logger = logger;
     this.defaultCellSize = defaultCellSize;
   }
 
+  /**
+   * Parses `/biomemap` arguments and triggers the export.
+   */
   @Override
   public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
     String worldName = args.length >= 1 && !args[0].isBlank() ? args[0] : DEFAULT_WORLD;
@@ -58,11 +70,13 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
     }
 
     logger.info(
-        String.format("[BiomeMap] Exporting biomes for world '%s' (cellSize=%d)...",
-            world.getName(), cellSize));
+        String.format(
+            "[BiomeMap] Exporting biomes for world '%s' (cellSize=%d)...", world.getName(),
+            cellSize));
     sender.sendMessage(
-        String.format("§a[BiomeMap] Exporting biomes for world '%s' (cellSize=%d)...",
-            world.getName(), cellSize));
+        String.format(
+            "§a[BiomeMap] Exporting biomes for world '%s' (cellSize=%d)...", world.getName(),
+            cellSize));
 
     ExportResult result;
     try {
@@ -74,18 +88,23 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
     }
 
     logger.info(
-        String.format("[BiomeMap] Export complete: %d cells saved to biome-map.json (%.2fs).",
+        String.format(
+            "[BiomeMap] Export complete: %d cells saved to biome-map.json (%.2fs).",
             result.cellCount(), result.durationMs() / 1000.0));
     sender.sendMessage(
-        String.format("§a[BiomeMap] Export complete: %d cells saved to biome-map.json.",
+        String.format(
+            "§a[BiomeMap] Export complete: %d cells saved to biome-map.json.",
             result.cellCount()));
     sender.sendMessage("§7Location: " + result.outputFile().getAbsolutePath());
     return true;
   }
 
+  /**
+   * Provides suggestions for world names and cell sizes.
+   */
   @Override
-  public List<String> onTabComplete(CommandSender sender, Command command, String alias,
-      String[] args) {
+  public List<String> onTabComplete(
+      CommandSender sender, Command command, String alias, String[] args) {
     if (args.length == 1) {
       String prefix = args[0].toLowerCase(Locale.ROOT);
       List<String> suggestions = new ArrayList<>();
