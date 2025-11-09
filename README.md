@@ -1,37 +1,51 @@
 <div align="center">
 
 # BiomeMap
-BiomeMap generates a lightweight JSON file mapping each world region to its dominant biome. Ideal for creating stylized biome maps on external web apps.
+
+BiomeMap generates a lightweight JSON file mapping each world region to its dominant biome. 
+Ideal for creating stylized biome maps on external web apps.
+
 </div>
 
-## Why BiomeMap?
-- Generates `plugins/BiomeMap/data/biome-map.json` covering ±5 000 blocks around the spawn.
-- Samples each cell (center + corners) to record the dominant biome ID.
-- Output schema stays tiny and web-friendly for quick visualization pipelines.
+## 📋 Overview
 
-## Requirements
-- PaperMC 1.21.8 server
-- Java 21+
-- Gradle (wrapper provided)
+BiomeMap walks a configurable grid (default 32×32 blocks) around a world’s spawn, samples the biome at the 
+center and corners of every cell, and records the dominant biome ID. 
+The result is a compact JSON file (`plugins/BiomeMap/data/biome-map.json`) ready for web renderers, 
+dashboards, or custom tooling—no world edits required.
 
-## Build & Install
-```bash
-./gradlew build
-```
-Copy `build/libs/BiomeMap.jar` to your server’s `plugins/` folder and restart/reload.
+## ✨ Features
 
-## Command
-| Command | Args | Description |
-|---------|------|-------------|
-| `/biomemap [world] [cellSize]` | `world` defaults to `world`; `cellSize` defaults to `32` | Scans the target world and writes the JSON export. |
+- ±5000 block coverage per world, set once via constants
+- Multi-point sampling per cell to smooth biome borders
+- JSON schema designed for lightweight web consumption
+- `/biomemap` command with tab completion and validation
+- Read-only by design, never writes back to world data
 
-Feedback goes to both console and the caller, e.g.:
+## 🚀 Installation
+
+1. Run PaperMC **1.21.8** on **Java 21+**
+2. Build the plugin
+   ```bash
+   ./gradlew build
+   ```
+3. Drop `build/libs/BiomeMap.jar` into your server’s `plugins/` folder
+4. Restart the server (or `/reload confirm`)
+
+## 🕹 Command Reference
+
+| Command | Arguments | Description |
+|---------|-----------|-------------|
+| `/biomemap [world] [cellSize]` | `world` defaults to `world`, `cellSize` defaults to `32` | Generates the biome export for the specified world. |
+
+Console and caller receive status updates:
 ```
 [BiomeMap] Exporting biomes for world 'world' (cellSize=32)...
 [BiomeMap] Export complete: 97344 cells saved to biome-map.json
 ```
 
-## JSON Layout
+## 📦 JSON Schema
+
 ```json
 {
   "cellSize": 32,
@@ -44,12 +58,12 @@ Feedback goes to both console and the caller, e.g.:
   ]
 }
 ```
-- `i`,`j` index the grid; convert back to world coords via `origin + (index * cellSize)`.
-- `biome` is the namespaced biome ID returned by Paper.
 
-## Development Notes
-- Project package: `fr.sukikui.biomemap`.
-- Build script auto-syncs `plugin.yml` metadata with the Paper API version.
-- Source entry point: `src/main/java/fr/sukikui/biomemap/BiomeMap.java`.
+| Field | Description |
+|-------|-------------|
+| `cellSize` | Block width/height for each grid square. |
+| `origin` | World coordinates of the southwest corner of the grid. |
+| `width`, `height` | Number of cells exported on X/Z. |
+| `cells[].i`, `cells[].j` | Grid indices (convert with `origin + index * cellSize`). |
+| `cells[].biome` | Namespaced biome ID reported by Paper (e.g., `minecraft:mangrove_swamp`). |
 
-Happy mapping! 🎯
