@@ -64,10 +64,7 @@ All files are written to `plugins/BiomeMap/exports/`.
 
 Rules:
 - `index` starts at `1` and increases if the filename already exists.
-- PNG uses the exact same base name as the JSON file.
 - If you run `/biomemap stop`, files from the canceled export are removed.
-
-PNG biome colors are defined in `src/main/java/fr/sukikui/biomemap/export/BiomeColorPalette.java`.
 
 ## ⚙️ Configuration
 
