@@ -41,10 +41,7 @@ jobs:
 
           files: build/libs/!(*-@(dev|sources|javadoc)).jar
           version-type: release
-          loaders: |
-            paper
-            spigot
-            purpur
+          loaders: paper
 
       - name: 📝 Sync Modrinth description from README
         uses: funnyboy-roks/modrinth-auto-desc@v1.6
