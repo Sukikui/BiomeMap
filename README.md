@@ -36,31 +36,27 @@ Then it samples biomes and writes:
 
 Only one export can run at a time.
 
-### 1. Start an export
+### Commands
 
-```
-/biomemap <world> <x1> <z1> <x2> <z2> [cellSize] [preview]
-```
+| Command | Description |
+| --- | --- |
+| `/biomemap <world> <x1> <z1> <x2> <z2> [cellSize] [preview]` | Starts a biome export (JSON + optional PNG). |
+| `/biomemap stop` | Stops the current export and removes files from that run in `exports/`. |
 
-Arguments:
-- `<world>`: world name (for example `world`, `world_nether`)
-- `<x1> <z1>`: first corner of the area
-- `<x2> <z2>`: opposite corner of the area
-- `[cellSize]`: optional, default `16` (common values: `8`, `16`, `32`, `64`, ...)
-- `[preview]`: optional, add `preview` to generate PNG (`1 pixel = 1 cell`)
+### Arguments for `/biomemap`
+
+| Argument | Required | Description |
+| --- | --- | --- |
+| `<world>` | Yes | World name, for example `world` or `world_nether`. |
+| `<x1> <z1>` | Yes | First corner of the area. |
+| `<x2> <z2>` | Yes | Opposite corner of the area. |
+| `[cellSize]` | No | Cell size in blocks. Default `16` (common values: `8`, `16`, `32`, `64`, ...). |
+| `[preview]` | No | Add `preview` to generate a PNG (`1 pixel = 1 cell`). |
 
 Example:
 ```
 /biomemap world -512 -512 320 192 32 preview
 ```
-
-### 2. Stop current export
-
-```
-/biomemap stop
-```
-
-- Stops the running export and removes files from that run in `exports/`.
 
 ### 📁 Output files
 
