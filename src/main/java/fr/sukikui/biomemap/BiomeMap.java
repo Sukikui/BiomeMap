@@ -14,19 +14,28 @@ import org.bukkit.plugin.java.JavaPlugin;
  */
 public final class BiomeMap extends JavaPlugin {
 
-  public static final int DEFAULT_CELL_SIZE = 32;
-  public static final int SCAN_RADIUS = 5000;
+  public static final int DEFAULT_CELL_SIZE = 16;
+
+  private BiomeMapCommand commandHandler;
+  private int chunksPerTick;
+  private int maxInFlight;
+  private int maxConcurrentChunks;
 
   @Override
   public void onEnable() {
     PaperLib.suggestPaper(this);
     ensureDataFolder();
+    saveDefaultConfig();
+    loadPerformanceSettings();
 
     Logger logger = getLogger();
     File dataFolder = getDataFolder();
-    BiomeExporter exporter = new BiomeExporter(dataFolder, SCAN_RADIUS);
+    BiomeExporter exporter = new BiomeExporter(dataFolder);
 
-    BiomeMapCommand commandHandler = new BiomeMapCommand(exporter, logger, DEFAULT_CELL_SIZE);
+    commandHandler =
+        new BiomeMapCommand(
+            this, exporter, logger, DEFAULT_CELL_SIZE, chunksPerTick, maxInFlight,
+            maxConcurrentChunks);
     PluginCommand biomemapCommand =
         Objects.requireNonNull(
             getCommand("biomemap"), "Command biomemap not defined in plugin.yml");
@@ -34,9 +43,24 @@ public final class BiomeMap extends JavaPlugin {
     biomemapCommand.setTabCompleter(commandHandler);
   }
 
+  @Override
+  public void onDisable() {
+    if (commandHandler != null) {
+      commandHandler.cancelAllExports();
+    }
+  }
+
   private void ensureDataFolder() {
     if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
       getLogger().warning("Unable to create plugin data folder. Exports may fail.");
     }
+  }
+
+  private void loadPerformanceSettings() {
+    chunksPerTick = Math.max(1, getConfig().getInt("performance.chunks-per-tick", 1));
+    int configuredMaxInFlight = getConfig().getInt("performance.max-in-flight", chunksPerTick * 2);
+    maxInFlight = Math.max(chunksPerTick, configuredMaxInFlight);
+    maxConcurrentChunks = Math.max(
+        1, getConfig().getInt("performance.max-concurrent-chunks", 64));
   }
 }
