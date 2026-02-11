@@ -1,1 +1,7 @@
-# A journey of 1,000 lines starts with a single char
+performance:
+  # Maximum number of chunks scheduled per tick when exporting (>=1).
+  chunks-per-tick: 1
+  # Number of chunks that may be sampled concurrently (must be >= chunks-per-tick).
+  max-in-flight: 4
+  # Global server-side cap for chunks being loaded (IO throttle).
+  max-concurrent-chunks: 64
