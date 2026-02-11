@@ -43,7 +43,7 @@ Only one export can run at a time.
 | `/biomemap <world> <x1> <z1> <x2> <z2> [cellSize] [preview]` | Starts a biome export (JSON + optional PNG). |
 | `/biomemap stop` | Stops the current export and removes files from that run in `exports/`. |
 
-### Arguments for `/biomemap`
+### Arguments
 
 | Argument | Required | Description |
 | --- | --- | --- |
@@ -52,6 +52,11 @@ Only one export can run at a time.
 | `<x2> <z2>` | Yes | Opposite corner of the area. |
 | `[cellSize]` | No | Cell size in blocks. Default `16` (common values: `8`, `16`, `32`, `64`, ...). |
 | `[preview]` | No | Add `preview` to generate a PNG (`1 pixel = 1 cell`). |
+
+
+### Resolutions via `cellSize`
+
+![Different resolutions with cellSize](assets/cellsize_resolution.png)
 
 ## 📁 Output files
 

@@ -143,9 +143,9 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
 
     int chunkAlignedSize = cellSize;
     int chunkMinX = Math.floorDiv(selectionMinX, chunkAlignedSize);
-    int chunkMaxX = Math.floorDiv(selectionMaxX + chunkAlignedSize - 1, chunkAlignedSize);
+    int chunkMaxX = Math.floorDiv(selectionMaxX, chunkAlignedSize);
     int chunkMinZ = Math.floorDiv(selectionMinZ, chunkAlignedSize);
-    int chunkMaxZ = Math.floorDiv(selectionMaxZ + chunkAlignedSize - 1, chunkAlignedSize);
+    int chunkMaxZ = Math.floorDiv(selectionMaxZ, chunkAlignedSize);
 
     int width = chunkMaxX - chunkMinX + 1;
     int height = chunkMaxZ - chunkMinZ + 1;
