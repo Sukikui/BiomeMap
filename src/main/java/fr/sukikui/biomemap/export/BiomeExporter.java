@@ -2,18 +2,18 @@ package fr.sukikui.biomemap.export;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
@@ -23,60 +23,63 @@ import org.bukkit.block.Biome;
  */
 public final class BiomeExporter {
 
-  private static final String EXPORT_RELATIVE_PATH = "data/biome-map.json";
+  private static final String EXPORTS_FOLDER = "exports";
   private static final Gson GSON =
       new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
   private final File pluginFolder;
-  private final int scanRadius;
+  private final BiomePreviewRenderer previewRenderer = new BiomePreviewRenderer();
 
   /**
    * Creates a new exporter tied to the plugin data folder.
    *
    * @param pluginFolder location where exports will be saved
-   * @param scanRadius radius (in blocks) scanned around the spawn
    */
-  public BiomeExporter(File pluginFolder, int scanRadius) {
+  public BiomeExporter(File pluginFolder) {
     this.pluginFolder = pluginFolder;
-    this.scanRadius = scanRadius;
   }
 
   /**
-   * Exports the dominant biome grid for the given world.
-   *
-   * @param world Paper world to sample
-   * @param cellSize width/height of each sampled cell
-   * @return metadata about the export output
-   * @throws IOException if the JSON file cannot be written
+   * Resolves an output path using world + cell size + incremented index.
    */
-  public ExportResult exportWorld(World world, int cellSize) throws IOException {
-    long start = System.currentTimeMillis();
-    Location spawn = world.getSpawnLocation();
-    int originX = spawn.getBlockX() - scanRadius;
-    int originZ = spawn.getBlockZ() - scanRadius;
-    int diameter = scanRadius * 2;
-    int width = Math.max(1, diameter / cellSize);
-    int height = width;
-
-    List<BiomeCell> cells = new ArrayList<>(width * height);
-    for (int j = 0; j < height; j++) {
-      int cellOriginZ = originZ + (j * cellSize);
-      for (int i = 0; i < width; i++) {
-        int cellOriginX = originX + (i * cellSize);
-        String dominantBiome = determineDominantBiome(world, cellOriginX, cellOriginZ, cellSize);
-        cells.add(new BiomeCell(i, j, dominantBiome));
+  public File resolveSelectionOutput(String worldName, int cellSize) {
+    File exportsDir = new File(pluginFolder, EXPORTS_FOLDER);
+    String baseName = String.format(
+        Locale.ROOT,
+        "%s_%d",
+        sanitizeComponent(worldName),
+        cellSize);
+    Path basePath = exportsDir.toPath().toAbsolutePath().normalize();
+    for (int index = 1; index < Integer.MAX_VALUE; index++) {
+      String filename = String.format(Locale.ROOT, "%s_%d.json", baseName, index);
+      Path candidate = basePath.resolve(filename).normalize();
+      if (!candidate.startsWith(basePath)) {
+        throw new IllegalArgumentException("Selection output escaped exports directory");
+      }
+      if (!candidate.toFile().exists()) {
+        return candidate.toFile();
       }
     }
-
-    BiomeMapExport export =
-        new BiomeMapExport(cellSize, new Origin(originX, originZ), width, height, cells);
-    File outputFile = new File(pluginFolder, EXPORT_RELATIVE_PATH);
-    writeExport(export, outputFile);
-    long duration = System.currentTimeMillis() - start;
-    return new ExportResult(cells.size(), outputFile, duration);
+    throw new IllegalStateException("Unable to resolve available output filename");
   }
 
-  private void writeExport(BiomeMapExport export, File outputFile) throws IOException {
+  /**
+   * Samples the biome for a single cell.
+   */
+  public BiomeCell sampleCell(
+      World world, int cellSize, int cellMinX, int cellMinZ, int i, int j) {
+    int cellMaxX = cellMinX + cellSize - 1;
+    int cellMaxZ = cellMinZ + cellSize - 1;
+    String dominantBiome = determineDominantBiome(world, cellMinX, cellMinZ, cellSize);
+    BiomeCell.Bounds bounds =
+        new BiomeCell.Bounds(new Point(cellMinX, cellMinZ), new Point(cellMaxX, cellMaxZ));
+    return new BiomeCell(i, j, bounds, dominantBiome);
+  }
+
+  /**
+   * Writes the export to disk.
+   */
+  public void writeExport(BiomeMapExport export, File outputFile) throws IOException {
     File parent = outputFile.getParentFile();
     if (parent != null && !parent.exists() && !parent.mkdirs()) {
       throw new IOException("Unable to create directory " + parent);
@@ -87,7 +90,42 @@ public final class BiomeExporter {
     }
   }
 
-  private String determineDominantBiome(
+  /**
+   * Resolves the preview PNG path matching the provided JSON filename.
+   */
+  public File resolvePreviewOutput(File jsonOutputFile) {
+    Path jsonPath = jsonOutputFile.toPath().toAbsolutePath().normalize();
+    Path parent = jsonPath.getParent();
+    if (parent == null) {
+      throw new IllegalArgumentException("JSON output path has no parent directory");
+    }
+
+    Path fileName = jsonPath.getFileName();
+    if (fileName == null) {
+      throw new IllegalArgumentException("JSON output path has no filename");
+    }
+    String name = fileName.toString();
+    int extensionIndex = name.lastIndexOf('.');
+    String baseName = extensionIndex > 0 ? name.substring(0, extensionIndex) : name;
+    String safeBaseName = sanitizeComponent(baseName);
+    Path previewPath = parent.resolve(safeBaseName + ".png").normalize();
+    if (!previewPath.startsWith(parent)) {
+      throw new IllegalArgumentException("Preview output escaped target directory");
+    }
+    return previewPath.toFile();
+  }
+
+  /**
+   * Writes a PNG preview where each pixel represents one exported cell.
+   */
+  public void writePreview(BiomeMapExport export, File outputFile) throws IOException {
+    previewRenderer.writePreview(export, outputFile);
+  }
+
+  /**
+   * Determines the dominant biome for a cell by sampling five points.
+   */
+  public String determineDominantBiome(
       World world, int cellOriginX, int cellOriginZ, int cellSize) {
     Map<String, Integer> counts = new HashMap<>();
     int[][] offsets = new int[][] {
@@ -114,25 +152,48 @@ public final class BiomeExporter {
         .orElse("minecraft:unknown");
   }
 
-  private String biomeKey(Biome biome) {
+  /**
+   * Formats a biome object into its minecraft:namespace identifier, falling back to unknown.
+   */
+  public static String biomeKey(Biome biome) {
     if (biome == null) {
       return "minecraft:unknown";
     }
     NamespacedKey key = biome.getKey();
-    return key.asString();
+    return key.getNamespace() + ":" + key.getKey();
   }
 
-  /** Describes the result of a biome export run. */
-  public record ExportResult(int cellCount, File outputFile, long durationMs) {
+  private static String sanitizeComponent(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return "unknown";
+    }
+    String lower = raw.toLowerCase(Locale.ROOT);
+    String sanitized = lower.replaceAll("[^a-z0-9_-]", "_");
+    sanitized = sanitized.replaceAll("_+", "_");
+    return sanitized.isBlank() ? "unknown" : sanitized;
   }
 
-  private record BiomeCell(int i, int j, String biome) {
+  /** Simple DTO describing a cell coordinate and its biome id. */
+  public record BiomeCell(int i, int j, Bounds bounds, String biome) {
+
+    /** Bounding box of the cell in world coordinates. */
+    public record Bounds(Point min, Point max) {
+    }
   }
 
-  private record BiomeMapExport(int cellSize, Origin origin, int width, int height,
+  /** Bundles metadata and sampled cells for JSON export. */
+  @SuppressFBWarnings("EI_EXPOSE_REP")
+  public record BiomeMapExport(
+      int cellSize,
+      Point selectionMin,
+      Point selectionMax,
+      Point gridOrigin,
+      int width,
+      int height,
       List<BiomeCell> cells) {
   }
 
-  private record Origin(int x, int z) {
+  /** Simple x/z coordinate pair. */
+  public record Point(int x, int z) {
   }
 }
