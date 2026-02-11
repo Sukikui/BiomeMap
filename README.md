@@ -53,7 +53,7 @@ Only one export can run at a time.
 | `[cellSize]` | No | Cell size in blocks. Default `16` (common values: `8`, `16`, `32`, `64`, ...). |
 | `[preview]` | No | Add `preview` to generate a PNG (`1 pixel = 1 cell`). |
 
-### 📁 Output files
+## 📁 Output files
 
 All files are written to `plugins/BiomeMap/exports/`.
 
@@ -69,7 +69,7 @@ Rules:
 
 PNG biome colors are defined in `src/main/java/fr/sukikui/biomemap/export/BiomeColorPalette.java`.
 
-### ⚙️ Configuration
+## ⚙️ Configuration
 
 `config.yml` exposes performance throttles.
 
