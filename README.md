@@ -9,13 +9,10 @@ Generates a lightweight JSON file mapping each world region to its dominant biom
 ## 📋 Overview
 
 BiomeMap exports the dominant biome of a rectangular selection.
-
 You choose a world and 2 corners (`x/z`), and the plugin builds a grid of cells over that area.  
 Then it samples biomes and writes:
 - a JSON file
 - optionally a PNG preview (`1 pixel = 1 cell`)
-
-It is read-only: no world edits, no database, no extra services.
 
 ## ✨ Features
 
@@ -37,27 +34,33 @@ It is read-only: no world edits, no database, no extra services.
 
 ## 🕹 Command Usage
 
-| Command | Arguments | Description |
-| --- | --- | --- |
-| `/biomemap <world> <x1> <z1> <x2> <z2> [cellSize] [preview]` | `world` required, `cellSize` default `16`, `preview` optional | Exports the full rectangle between the 2 points. If `preview` is present, also writes a PNG. |
-| `/biomemap stop` | none | Stops the current export. |
+Only one export can run at a time.
 
-Notes:
-- Good `cellSize` values: `8`, `16`, `32`, `64`, ...
-- `preview` can be written as `preview` or `--preview`
-- If an export is stopped, files for that run are deleted from `exports/`
+### 1. Start an export
+
+```
+/biomemap <world> <x1> <z1> <x2> <z2> [cellSize] [preview]
+```
+
+Arguments:
+- `<world>`: world name (for example `world`, `world_nether`)
+- `<x1> <z1>`: first corner of the area
+- `<x2> <z2>`: opposite corner of the area
+- `[cellSize]`: optional, default `16` (common values: `8`, `16`, `32`, `64`, ...)
+- `[preview]`: optional, add `preview` to generate PNG (`1 pixel = 1 cell`)
 
 Example:
 ```
-/biomemap world -512 -512 320 192 32
-```
-→ covers the area between `(-512,-512)` and `(320,192)` using 32×32-block cells (chunk-aligned).
-
-Preview example:
-```
 /biomemap world -512 -512 320 192 32 preview
 ```
-→ same JSON export + PNG preview with one pixel per cell.
+
+### 2. Stop current export
+
+```
+/biomemap stop
+```
+
+- Stops the running export and removes files from that run in `exports/`.
 
 ### 📁 Output files
 
