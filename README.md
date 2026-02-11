@@ -54,7 +54,7 @@ Only one export can run at a time.
 | `[preview]` | No | Add `preview` to generate a PNG (`1 pixel = 1 cell`). |
 
 
-### Resolutions via `cellSize`
+### `cellSize` resolutions
 
 <img src="assets/cellsize_resolution.png" alt="Different resolutions with cellSize" width="600">
 
