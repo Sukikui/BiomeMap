@@ -53,24 +53,21 @@ Only one export can run at a time.
 | `[cellSize]` | No | Cell size in blocks. Default `16` (common values: `8`, `16`, `32`, `64`, ...). |
 | `[preview]` | No | Add `preview` to generate a PNG (`1 pixel = 1 cell`). |
 
-Example:
-```
-/biomemap world -512 -512 320 192 32 preview
-```
-
 ### 📁 Output files
 
-Exports are written to `plugins/BiomeMap/exports/`.
+All files are written to `plugins/BiomeMap/exports/`.
 
-JSON files use:
-- `<world>_<cellSize>_<index>.json`
+| File | Pattern | Created when |
+| --- | --- | --- |
+| JSON | `<world>_<cellSize>_<index>.json` | Always |
+| PNG | `<world>_<cellSize>_<index>.png` | Only if `preview` is used |
 
-If the filename already exists, `index` is incremented (`world_32_1.json`, `world_32_2.json`, ...).
+Rules:
+- `index` starts at `1` and increases if the filename already exists.
+- PNG uses the exact same base name as the JSON file.
+- If you run `/biomemap stop`, files from the canceled export are removed.
 
-If `preview` is enabled, the plugin also writes PNG files with the same base name as each JSON file:
-- `plugins/BiomeMap/exports/<world>_<cellSize>_<index>.png`
-
-Biome colors come from `src/main/java/fr/sukikui/biomemap/export/BiomeColorPalette.java` (vanilla 1.21.11 palette with deterministic fallback for unknown biome ids).
+PNG biome colors are defined in `src/main/java/fr/sukikui/biomemap/export/BiomeColorPalette.java`.
 
 ### ⚙️ Configuration
 
