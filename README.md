@@ -73,7 +73,7 @@ Rules:
 
 ## ⚙️ Configuration
 
-`config.yml` exposes performance throttles.
+[`config.yml`](src/main/resources/config.yml) exposes performance throttles.
 
 | Key | Default | Description |
 | --- | --- | --- |
