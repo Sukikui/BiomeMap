@@ -56,7 +56,7 @@ Only one export can run at a time.
 
 ### `cellSize` resolutions
 
-<img src="assets/cellsize_resolution.png" alt="Different resolutions with cellSize" width="600">
+<img src="assets/cellsize_examples.png" alt="Different resolutions with cellSize" width="600">
 
 ## 📁 Output files
 
