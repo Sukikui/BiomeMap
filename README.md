@@ -41,6 +41,7 @@ Only one export can run at a time.
 | Command | Description |
 | --- | --- |
 | `/biomemap <world> <x1> <z1> <x2> <z2> [cellSize] [preview]` | Starts a biome export (JSON + optional PNG). |
+| `/biomemap status [map]` | Shows current progress, ETA, outputs. Add `map` for compact ASCII completion map. |
 | `/biomemap stop` | Stops the current export and removes files from that run in `exports/`. |
 
 ### Arguments

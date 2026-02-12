@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -20,6 +21,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.command.RemoteConsoleCommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 /**
@@ -31,6 +33,11 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
   private static final int CHUNK_SIZE = 16;
   private static final int MIN_CELL_SIZE = 8;
   private static final String CHAT_PREFIX = "§8[§b§lBiomeMap§8] §r";
+  private static final int PLAYER_STATUS_MAP_MAX_WIDTH = 28;
+  private static final int PLAYER_STATUS_MAP_MAX_HEIGHT = 10;
+  private static final int CONSOLE_STATUS_MAP_MAX_WIDTH = 56;
+  private static final int CONSOLE_STATUS_MAP_MAX_HEIGHT = 18;
+  private static final int STATUS_BAR_WIDTH = 20;
 
   private final JavaPlugin plugin;
   private final BiomeExporter exporter;
@@ -71,6 +78,9 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
    */
   @Override
   public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    if (args.length >= 1 && "status".equalsIgnoreCase(args[0])) {
+      return handleStatusCommand(sender, args);
+    }
     if (args.length >= 1 && "stop".equalsIgnoreCase(args[0])) {
       return handleStopCommand(sender, args);
     }
@@ -79,6 +89,7 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
           sender,
           "Usage: /biomemap <world> <x1> <z1> <x2> <z2> [cellSize] [preview]");
       sendWarning(sender, "Stop: /biomemap stop");
+      sendWarning(sender, "Status: /biomemap status [map]");
       return true;
     }
 
@@ -215,10 +226,11 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
 
     String worldKey = world.getName().toLowerCase(Locale.ROOT);
     Runnable completion = () -> runningExports.remove(worldKey);
+    UUID senderPlayerId = sender instanceof Player player ? player.getUniqueId() : null;
     AsyncBiomeExportTask task =
         new AsyncBiomeExportTask(plugin, exporter, world, cellSize, width, height,
             originX, originZ, selectionMinX, selectionMinZ, selectionMaxX, selectionMaxZ,
-            selectionOutputFile, previewEnabled, sender, logger, completion,
+            selectionOutputFile, previewEnabled, sender, senderPlayerId, logger, completion,
             chunksPerTick,
             maxInFlight,
             maxConcurrentChunks);
@@ -236,6 +248,9 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
     if (args.length == 1) {
       String prefix = args[0].toLowerCase(Locale.ROOT);
       List<String> suggestions = new ArrayList<>();
+      if ("status".startsWith(prefix)) {
+        suggestions.add("status");
+      }
       if ("stop".startsWith(prefix)) {
         suggestions.add("stop");
       }
@@ -246,6 +261,12 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
         }
       }
       return suggestions;
+    } else if (args.length == 2 && "status".equalsIgnoreCase(args[0])) {
+      String prefix = args[1].toLowerCase(Locale.ROOT);
+      if ("map".startsWith(prefix)) {
+        return List.of("map");
+      }
+      return Collections.emptyList();
     } else if (args.length >= 6) {
       return List.of("8", "16", "32", "64", "128", "256", "preview");
     }
@@ -275,6 +296,101 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
       task.cancelAndCleanup();
     }
     sendWarning(sender, "Stopped running export. Temporary output files removed.");
+    return true;
+  }
+
+  private boolean handleStatusCommand(CommandSender sender, String[] args) {
+    boolean showMap = false;
+    if (args.length == 2) {
+      String option = args[1];
+      if ("map".equalsIgnoreCase(option) || "--map".equalsIgnoreCase(option)) {
+        showMap = true;
+      } else {
+        sendWarning(sender, "Usage: /biomemap status [map]");
+        return true;
+      }
+    } else if (args.length != 1) {
+      sendWarning(sender, "Usage: /biomemap status [map]");
+      return true;
+    }
+    if (runningExports.isEmpty()) {
+      sendWarning(sender, "No biome export is currently running.");
+      return true;
+    }
+
+    AsyncBiomeExportTask task = runningExports.values().iterator().next();
+    AsyncBiomeExportTask.ExportStatus status = task.snapshotStatus();
+
+    sendInfo(sender, "§b§lExport status§7 (running)");
+    sendInfo(
+        sender,
+        String.format(
+            Locale.ROOT,
+            "World=§f%s§7 cell=§f%d§7 preview=§f%s",
+            status.worldName(),
+            status.cellSize(),
+            status.previewEnabled() ? "on" : "off"));
+    sendInfo(
+        sender,
+        String.format(
+            Locale.ROOT,
+            "Area=§f[%d,%d -> %d,%d]§7 grid=§f%dx%d§7 cells=§f%d",
+            status.selectionMinX(),
+            status.selectionMinZ(),
+            status.selectionMaxX(),
+            status.selectionMaxZ(),
+            status.gridWidth(),
+            status.gridHeight(),
+            status.totalCells()));
+
+    String eta = status.etaMs() < 0 ? "n/a" : formatDuration(status.etaMs());
+    String progressBar = buildProgressBar(status.progressPercent(), STATUS_BAR_WIDTH);
+    sendInfo(
+        sender,
+        String.format(
+            Locale.ROOT,
+            "Progress=§f%s§7 §f%.1f%%§7 chunks=§f%d/%d§7 elapsed=§f%s§7 eta=§f%s",
+            progressBar,
+            status.progressPercent(),
+            status.completedChunks(),
+            status.totalChunks(),
+            formatDuration(status.elapsedMs()),
+            eta));
+
+    if (status.initiatorName() != null && !status.initiatorName().isBlank()) {
+      String initiatorState = status.initiatorOnline() ? "online" : "offline";
+      sendInfo(
+          sender,
+          String.format(
+              Locale.ROOT,
+              "Initiator=§f%s§7 (%s)",
+              status.initiatorName(),
+              initiatorState));
+    }
+
+    sendInfo(sender, "JSON=§f" + status.jsonPath());
+    if (status.previewPath() != null) {
+      sendInfo(sender, "PNG=§f" + status.previewPath());
+    }
+
+    if (showMap) {
+      int maxWidth =
+          isConsoleSender(sender) ? CONSOLE_STATUS_MAP_MAX_WIDTH : PLAYER_STATUS_MAP_MAX_WIDTH;
+      int maxHeight =
+          isConsoleSender(sender) ? CONSOLE_STATUS_MAP_MAX_HEIGHT : PLAYER_STATUS_MAP_MAX_HEIGHT;
+      sendInfo(
+          sender,
+          String.format(
+              Locale.ROOT,
+              "Selection map (§f%d×%d§7 chunks, compact view):",
+              status.mapWidth(),
+              status.mapHeight()));
+      for (String line : task.renderProgressAsciiMap(maxWidth, maxHeight)) {
+        sendInfo(sender, "§f" + line);
+      }
+    } else {
+      sendInfo(sender, "Tip: run §f/biomemap status map§7 for ASCII map.");
+    }
     return true;
   }
 
@@ -325,8 +441,34 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
     sender.sendMessage(CHAT_PREFIX + "§6" + message);
   }
 
+  private void sendInfo(CommandSender sender, String message) {
+    sender.sendMessage(CHAT_PREFIX + "§7" + message);
+  }
+
   private void sendError(CommandSender sender, String message) {
     sender.sendMessage(CHAT_PREFIX + "§c§lError: §c" + message);
+  }
+
+  private String formatDuration(long durationMs) {
+    long totalSeconds = Math.max(0L, durationMs / 1000L);
+    long hours = totalSeconds / 3600L;
+    long minutes = (totalSeconds % 3600L) / 60L;
+    long seconds = totalSeconds % 60L;
+    if (hours > 0) {
+      return String.format(Locale.ROOT, "%dh %02dm %02ds", hours, minutes, seconds);
+    }
+    if (minutes > 0) {
+      return String.format(Locale.ROOT, "%dm %02ds", minutes, seconds);
+    }
+    return String.format(Locale.ROOT, "%ds", seconds);
+  }
+
+  private String buildProgressBar(double percent, int width) {
+    int safeWidth = Math.max(1, width);
+    double bounded = Math.max(0.0, Math.min(100.0, percent));
+    int filled = (int) Math.round((bounded / 100.0) * safeWidth);
+    filled = Math.max(0, Math.min(safeWidth, filled));
+    return "[" + "#".repeat(filled) + "-".repeat(safeWidth - filled) + "]";
   }
 
   private String toLogPath(File file) {

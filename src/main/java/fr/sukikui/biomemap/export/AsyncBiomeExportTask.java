@@ -8,13 +8,17 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -27,6 +31,7 @@ import org.bukkit.block.Biome;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.command.RemoteConsoleCommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -38,6 +43,8 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
 
   private static final int CHUNK_SIZE = 16;
   private static final String CHAT_PREFIX = "§8[§b§lBiomeMap§8] §r";
+  private static final long PROGRESS_HEARTBEAT_MS = TimeUnit.MINUTES.toMillis(5);
+  private static final double EPSILON = 0.000001;
 
   private final Plugin plugin;
   private final BiomeExporter exporter;
@@ -55,6 +62,7 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
   private final File outputFile;
   private final boolean previewEnabled;
   private final CommandSender sender;
+  private final UUID senderPlayerId;
   private final Logger logger;
   private final Runnable completionCallback;
   private final BiomeCell[] cells;
@@ -74,7 +82,8 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
   private final AtomicInteger inFlight = new AtomicInteger(0);
   private final AtomicLong chunksCompleted = new AtomicLong(0);
   private final long totalChunks;
-  private final int progressInterval;
+  private int nextProgressPercent = 10;
+  private final boolean[] chunkCompletedMap;
 
   private final Queue<ChunkCompletion> completedChunks = new ConcurrentLinkedQueue<>();
   private final AtomicBoolean aggregating = new AtomicBoolean(false);
@@ -82,6 +91,7 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
   private final AtomicBoolean stopRequested = new AtomicBoolean(false);
   private final AtomicBoolean completionNotified = new AtomicBoolean(false);
   private final long startTimeMs = System.currentTimeMillis();
+  private long lastProgressLogAtMs = startTimeMs;
   private volatile File outputPreviewFile;
 
   /**
@@ -103,6 +113,7 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
       File outputFile,
       boolean previewEnabled,
       CommandSender sender,
+      UUID senderPlayerId,
       Logger logger,
       Runnable completionCallback,
       int chunksPerTick,
@@ -124,6 +135,7 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
     this.outputFile = outputFile;
     this.previewEnabled = previewEnabled;
     this.sender = sender;
+    this.senderPlayerId = senderPlayerId;
     this.logger = logger;
     this.completionCallback = completionCallback;
     this.cells = new BiomeCell[width * height];
@@ -145,7 +157,7 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
     this.chunkStartZ = Math.floorDiv(originZ, CHUNK_SIZE);
     this.chunkBiomes = new String[chunkColumns * chunkRows];
     this.totalChunks = chunkBiomes.length;
-    this.progressInterval = Math.max(1, chunkBiomes.length / 10);
+    this.chunkCompletedMap = new boolean[chunkBiomes.length];
   }
 
   /**
@@ -174,6 +186,11 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
       }
       scheduleChunk(chunkIndex);
       scheduledThisTick++;
+    }
+
+    long completedSoFar = chunksCompleted.get();
+    if (completedSoFar < totalChunks) {
+      maybeReportProgress(completedSoFar, true);
     }
 
     if (nextChunkIndex.get() >= chunkBiomes.length && inFlight.get() == 0) {
@@ -313,10 +330,10 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
       chunkBiomes[completion.chunkIndex] = biomeId;
     }
     long completed = chunksCompleted.incrementAndGet();
-
-    if (completed % progressInterval == 0 || completed == totalChunks) {
-      reportProgress(completed);
+    if (completion.chunkIndex >= 0 && completion.chunkIndex < chunkCompletedMap.length) {
+      chunkCompletedMap[completion.chunkIndex] = true;
     }
+    maybeReportProgress(completed, false);
 
     if (nextChunkIndex.get() >= chunkBiomes.length && remaining == 0) {
       if (subChunkSampling) {
@@ -340,6 +357,28 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
           Locale.ROOT, "Progress %.1f%% (%d/%d chunks)", percent, completedChunks, totalChunks);
       logger.info(plainLine);
     }
+  }
+
+  private void maybeReportProgress(long completedChunks, boolean timeoutCheck) {
+    if (totalChunks <= 0) {
+      return;
+    }
+    double percent = (completedChunks * 100.0) / totalChunks;
+    boolean reachedThreshold = false;
+    while (nextProgressPercent <= 100 && percent + EPSILON >= nextProgressPercent) {
+      reachedThreshold = true;
+      nextProgressPercent += 10;
+    }
+    boolean completed = completedChunks >= totalChunks;
+    long now = System.currentTimeMillis();
+    boolean timedOut = timeoutCheck
+        && !completed
+        && (now - lastProgressLogAtMs) >= PROGRESS_HEARTBEAT_MS;
+    if (!reachedThreshold && !completed && !timedOut) {
+      return;
+    }
+    reportProgress(completedChunks);
+    lastProgressLogAtMs = now;
   }
 
   private void startAggregation() {
@@ -544,19 +583,216 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
   }
 
   private void sendInfo(String message) {
-    sender.sendMessage(CHAT_PREFIX + "§7" + message);
+    sendToInvoker(CHAT_PREFIX + "§7" + message);
   }
 
   private void sendSuccess(String message) {
-    sender.sendMessage(CHAT_PREFIX + "§a§l" + message);
+    sendToInvoker(CHAT_PREFIX + "§a§l" + message);
   }
 
   private void sendError(String message) {
-    sender.sendMessage(CHAT_PREFIX + "§c§lError: §c" + message);
+    sendToInvoker(CHAT_PREFIX + "§c§lError: §c" + message);
   }
 
   private boolean isConsoleSender() {
+    if (senderPlayerId != null) {
+      return false;
+    }
     return sender instanceof ConsoleCommandSender || sender instanceof RemoteConsoleCommandSender;
+  }
+
+  private void sendToInvoker(String message) {
+    CommandSender recipient = resolveCurrentRecipient();
+    if (recipient == null) {
+      return;
+    }
+    recipient.sendMessage(message);
+  }
+
+  private CommandSender resolveCurrentRecipient() {
+    if (senderPlayerId == null) {
+      return sender;
+    }
+    Player player = Bukkit.getPlayer(senderPlayerId);
+    if (player == null || !player.isOnline()) {
+      return null;
+    }
+    return player;
+  }
+
+  /**
+   * Returns a status snapshot for the currently running export.
+   */
+  public ExportStatus snapshotStatus() {
+    long completedChunksSnapshot = chunksCompleted.get();
+    long elapsedMs = System.currentTimeMillis() - startTimeMs;
+    long etaMs = -1L;
+    if (completedChunksSnapshot > 0 && completedChunksSnapshot < totalChunks) {
+      double msPerChunk = elapsedMs / (double) completedChunksSnapshot;
+      etaMs = (long) (msPerChunk * (totalChunks - completedChunksSnapshot));
+    }
+
+    String previewPath = null;
+    if (previewEnabled) {
+      try {
+        File previewFile = outputPreviewFile != null
+            ? outputPreviewFile
+            : exporter.resolvePreviewOutput(outputFile);
+        previewPath = toLogPath(previewFile);
+      } catch (IllegalArgumentException ex) {
+        previewPath = null;
+      }
+    }
+
+    String initiatorName = senderPlayerId == null ? sender.getName() : null;
+    boolean initiatorOnline = false;
+    if (senderPlayerId != null) {
+      Player player = Bukkit.getPlayer(senderPlayerId);
+      if (player != null) {
+        initiatorName = player.getName();
+        initiatorOnline = player.isOnline();
+      } else {
+        initiatorName = sender.getName();
+      }
+    }
+
+    return new ExportStatus(
+        world.getName(),
+        selectionMinX,
+        selectionMinZ,
+        selectionMaxX,
+        selectionMaxZ,
+        cellSize,
+        width,
+        height,
+        cells.length,
+        previewEnabled,
+        chunkColumns,
+        chunkRows,
+        completedChunksSnapshot,
+        totalChunks,
+        totalChunks <= 0 ? 100.0 : (completedChunksSnapshot * 100.0) / totalChunks,
+        elapsedMs,
+        etaMs,
+        toLogPath(outputFile),
+        previewPath,
+        initiatorName,
+        initiatorOnline);
+  }
+
+  /**
+   * Renders a compact ASCII minimap of chunk completion.
+   */
+  public List<String> renderProgressAsciiMap(int maxWidth, int maxHeight) {
+    int targetWidth = Math.max(1, maxWidth);
+    int targetHeight = Math.max(1, maxHeight);
+    int[] size = resolveRenderSize(chunkColumns, chunkRows, targetWidth, targetHeight);
+    int widthChars = size[0];
+    int heightChars = size[1];
+
+    List<String> lines = new ArrayList<>(heightChars + 2);
+    lines.add("+" + "-".repeat(widthChars) + "+");
+    for (int y = 0; y < heightChars; y++) {
+      int sourceRowStart = (int) Math.floor((y * (double) chunkRows) / heightChars);
+      int sourceRowEnd = (int) Math.ceil(((y + 1) * (double) chunkRows) / heightChars);
+      sourceRowEnd = Math.min(chunkRows, Math.max(sourceRowEnd, sourceRowStart + 1));
+
+      StringBuilder row = new StringBuilder(widthChars + 2);
+      row.append('|');
+      for (int x = 0; x < widthChars; x++) {
+        int sourceColStart = (int) Math.floor((x * (double) chunkColumns) / widthChars);
+        int sourceColEnd = (int) Math.ceil(((x + 1) * (double) chunkColumns) / widthChars);
+        sourceColEnd = Math.min(chunkColumns, Math.max(sourceColEnd, sourceColStart + 1));
+
+        int total = 0;
+        int done = 0;
+        for (int sourceRow = sourceRowStart; sourceRow < sourceRowEnd; sourceRow++) {
+          int base = sourceRow * chunkColumns;
+          for (int sourceCol = sourceColStart; sourceCol < sourceColEnd; sourceCol++) {
+            int index = base + sourceCol;
+            if (index < 0 || index >= chunkCompletedMap.length) {
+              continue;
+            }
+            total++;
+            if (chunkCompletedMap[index]) {
+              done++;
+            }
+          }
+        }
+        double fill = total == 0 ? 0.0 : done / (double) total;
+        row.append(fillChar(fill));
+      }
+      row.append('|');
+      lines.add(row.toString());
+    }
+    lines.add("+" + "-".repeat(widthChars) + "+");
+    return lines;
+  }
+
+  private int[] resolveRenderSize(int sourceWidth, int sourceHeight, int maxWidth, int maxHeight) {
+    if (sourceWidth <= 0 || sourceHeight <= 0) {
+      return new int[] {1, 1};
+    }
+    int width = Math.min(sourceWidth, maxWidth);
+    double aspect = sourceHeight / (double) sourceWidth;
+    int height = Math.max(1, (int) Math.round(width * aspect));
+
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = Math.max(1, (int) Math.round(height / aspect));
+      width = Math.min(width, maxWidth);
+    }
+
+    width = Math.max(1, Math.min(width, sourceWidth));
+    height = Math.max(1, Math.min(height, sourceHeight));
+    return new int[] {width, height};
+  }
+
+  private char fillChar(double fill) {
+    if (fill <= 0.0) {
+      return '.';
+    }
+    if (fill >= 1.0) {
+      return '#';
+    }
+    if (fill < 0.2) {
+      return ':';
+    }
+    if (fill < 0.4) {
+      return '-';
+    }
+    if (fill < 0.6) {
+      return '=';
+    }
+    if (fill < 0.8) {
+      return '+';
+    }
+    return '*';
+  }
+
+  /** Immutable status payload for command rendering. */
+  public record ExportStatus(
+      String worldName,
+      int selectionMinX,
+      int selectionMinZ,
+      int selectionMaxX,
+      int selectionMaxZ,
+      int cellSize,
+      int gridWidth,
+      int gridHeight,
+      int totalCells,
+      boolean previewEnabled,
+      int mapWidth,
+      int mapHeight,
+      long completedChunks,
+      long totalChunks,
+      double progressPercent,
+      long elapsedMs,
+      long etaMs,
+      String jsonPath,
+      String previewPath,
+      String initiatorName,
+      boolean initiatorOnline) {
   }
 
   private String toLogPath(File file) {

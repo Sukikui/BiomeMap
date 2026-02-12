@@ -6,5 +6,5 @@ author: AUTHOR
 description: DESCRIPTION
 commands:
   biomemap:
-    description: Export dominant biomes to JSON/PNG and stop the current export.
-    usage: "/biomemap <world> <x1> <z1> <x2> <z2> [cellSize] [preview] | /biomemap stop"
+    description: Export dominant biomes to JSON/PNG, check status, and stop the current export.
+    usage: "/biomemap <world> <x1> <z1> <x2> <z2> [cellSize] [preview] | /biomemap status [map] | /biomemap stop"
