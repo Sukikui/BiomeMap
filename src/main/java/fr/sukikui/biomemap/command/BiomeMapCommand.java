@@ -3,6 +3,7 @@ package fr.sukikui.biomemap.command;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import fr.sukikui.biomemap.export.AsyncBiomeExportTask;
 import fr.sukikui.biomemap.export.BiomeExporter;
+import fr.sukikui.biomemap.util.ProgressFormatter;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -37,7 +38,6 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
   private static final int PLAYER_STATUS_MAP_MAX_HEIGHT = 10;
   private static final int CONSOLE_STATUS_MAP_MAX_WIDTH = 56;
   private static final int CONSOLE_STATUS_MAP_MAX_HEIGHT = 18;
-  private static final int STATUS_BAR_WIDTH = 20;
 
   private final JavaPlugin plugin;
   private final BiomeExporter exporter;
@@ -343,19 +343,15 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
             status.gridHeight(),
             status.totalCells()));
 
-    String eta = status.etaMs() < 0 ? "n/a" : formatDuration(status.etaMs());
-    String progressBar = buildProgressBar(status.progressPercent(), STATUS_BAR_WIDTH);
     sendInfo(
         sender,
-        String.format(
-            Locale.ROOT,
-            "Progress=§f%s§7 §f%.1f%%§7 chunks=§f%d/%d§7 elapsed=§f%s§7 eta=§f%s",
-            progressBar,
+        ProgressFormatter.formatChatLine(
             status.progressPercent(),
             status.completedChunks(),
             status.totalChunks(),
-            formatDuration(status.elapsedMs()),
-            eta));
+            status.elapsedMs(),
+            status.etaMs(),
+            ProgressFormatter.DEFAULT_BAR_WIDTH));
 
     if (status.initiatorName() != null && !status.initiatorName().isBlank()) {
       String initiatorState = status.initiatorOnline() ? "online" : "offline";
@@ -447,28 +443,6 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
 
   private void sendError(CommandSender sender, String message) {
     sender.sendMessage(CHAT_PREFIX + "§c§lError: §c" + message);
-  }
-
-  private String formatDuration(long durationMs) {
-    long totalSeconds = Math.max(0L, durationMs / 1000L);
-    long hours = totalSeconds / 3600L;
-    long minutes = (totalSeconds % 3600L) / 60L;
-    long seconds = totalSeconds % 60L;
-    if (hours > 0) {
-      return String.format(Locale.ROOT, "%dh %02dm %02ds", hours, minutes, seconds);
-    }
-    if (minutes > 0) {
-      return String.format(Locale.ROOT, "%dm %02ds", minutes, seconds);
-    }
-    return String.format(Locale.ROOT, "%ds", seconds);
-  }
-
-  private String buildProgressBar(double percent, int width) {
-    int safeWidth = Math.max(1, width);
-    double bounded = Math.max(0.0, Math.min(100.0, percent));
-    int filled = (int) Math.round((bounded / 100.0) * safeWidth);
-    filled = Math.max(0, Math.min(safeWidth, filled));
-    return "[" + "#".repeat(filled) + "-".repeat(safeWidth - filled) + "]";
   }
 
   private String toLogPath(File file) {

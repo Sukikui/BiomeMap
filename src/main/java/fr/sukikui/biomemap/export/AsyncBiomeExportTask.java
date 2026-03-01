@@ -4,6 +4,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import fr.sukikui.biomemap.export.BiomeExporter.BiomeCell;
 import fr.sukikui.biomemap.export.BiomeExporter.BiomeMapExport;
 import fr.sukikui.biomemap.export.BiomeExporter.Point;
+import fr.sukikui.biomemap.util.ProgressFormatter;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -43,6 +44,7 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
 
   private static final int CHUNK_SIZE = 16;
   private static final String CHAT_PREFIX = "§8[§b§lBiomeMap§8] §r";
+  private static final long FIRST_PROGRESS_HEARTBEAT_MS = TimeUnit.SECONDS.toMillis(10);
   private static final long PROGRESS_HEARTBEAT_MS = TimeUnit.MINUTES.toMillis(5);
   private static final double EPSILON = 0.000001;
 
@@ -90,6 +92,7 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
   private final AtomicBoolean finishing = new AtomicBoolean(false);
   private final AtomicBoolean stopRequested = new AtomicBoolean(false);
   private final AtomicBoolean completionNotified = new AtomicBoolean(false);
+  private boolean hasProgressLog = false;
   private final long startTimeMs = System.currentTimeMillis();
   private long lastProgressLogAtMs = startTimeMs;
   private volatile File outputPreviewFile;
@@ -344,18 +347,24 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
     }
   }
 
-  private void reportProgress(long completedChunks) {
-    double percent = (completedChunks * 100.0) / totalChunks;
-    sendInfo(String.format(
-        Locale.ROOT,
-        "Progress §f§l%.1f%%§7 (§f%d/%d§7 chunks)",
-        percent,
-        completedChunks,
-        totalChunks));
+  private void reportProgress(ProgressFormatter.ProgressSnapshot progress) {
+    sendInfo(
+        ProgressFormatter.formatChatLine(
+            progress.progressPercent(),
+            progress.completedChunks(),
+            progress.totalChunks(),
+            progress.elapsedMs(),
+            progress.etaMs(),
+            ProgressFormatter.DEFAULT_BAR_WIDTH));
     if (!isConsoleSender()) {
-      String plainLine = String.format(
-          Locale.ROOT, "Progress %.1f%% (%d/%d chunks)", percent, completedChunks, totalChunks);
-      logger.info(plainLine);
+      logger.info(
+          ProgressFormatter.formatPlainLine(
+              progress.progressPercent(),
+              progress.completedChunks(),
+              progress.totalChunks(),
+              progress.elapsedMs(),
+              progress.etaMs(),
+              ProgressFormatter.DEFAULT_BAR_WIDTH));
     }
   }
 
@@ -363,7 +372,10 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
     if (totalChunks <= 0) {
       return;
     }
-    double percent = (completedChunks * 100.0) / totalChunks;
+    long elapsedMs = System.currentTimeMillis() - startTimeMs;
+    ProgressFormatter.ProgressSnapshot progress =
+        ProgressFormatter.calculate(completedChunks, totalChunks, elapsedMs);
+    double percent = progress.progressPercent();
     boolean reachedThreshold = false;
     while (nextProgressPercent <= 100 && percent + EPSILON >= nextProgressPercent) {
       reachedThreshold = true;
@@ -371,13 +383,20 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
     }
     boolean completed = completedChunks >= totalChunks;
     long now = System.currentTimeMillis();
-    boolean timedOut = timeoutCheck
+    boolean firstHeartbeatDue = timeoutCheck
         && !completed
+        && !hasProgressLog
+        && (now - startTimeMs) >= FIRST_PROGRESS_HEARTBEAT_MS;
+    boolean regularHeartbeatDue = timeoutCheck
+        && !completed
+        && hasProgressLog
         && (now - lastProgressLogAtMs) >= PROGRESS_HEARTBEAT_MS;
+    boolean timedOut = firstHeartbeatDue || regularHeartbeatDue;
     if (!reachedThreshold && !completed && !timedOut) {
       return;
     }
-    reportProgress(completedChunks);
+    reportProgress(progress);
+    hasProgressLog = true;
     lastProgressLogAtMs = now;
   }
 
@@ -626,11 +645,8 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
   public ExportStatus snapshotStatus() {
     long completedChunksSnapshot = chunksCompleted.get();
     long elapsedMs = System.currentTimeMillis() - startTimeMs;
-    long etaMs = -1L;
-    if (completedChunksSnapshot > 0 && completedChunksSnapshot < totalChunks) {
-      double msPerChunk = elapsedMs / (double) completedChunksSnapshot;
-      etaMs = (long) (msPerChunk * (totalChunks - completedChunksSnapshot));
-    }
+    ProgressFormatter.ProgressSnapshot progress =
+        ProgressFormatter.calculate(completedChunksSnapshot, totalChunks, elapsedMs);
 
     String previewPath = null;
     if (previewEnabled) {
@@ -671,9 +687,9 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
         chunkRows,
         completedChunksSnapshot,
         totalChunks,
-        totalChunks <= 0 ? 100.0 : (completedChunksSnapshot * 100.0) / totalChunks,
-        elapsedMs,
-        etaMs,
+        progress.progressPercent(),
+        progress.elapsedMs(),
+        progress.etaMs(),
         toLogPath(outputFile),
         previewPath,
         initiatorName,
