@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "fr.sukikui.biomemap"
-version = "0.1.5"
+version = "0.1.4"
 
 def minecraftVersion = '26.1.2'
 def paperApiVersion = "${minecraftVersion}.build.65-stable"
