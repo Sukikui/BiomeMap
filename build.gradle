@@ -2,22 +2,26 @@ import com.github.spotbugs.snom.SpotBugsTask
 
 plugins {
     id 'checkstyle'
-    id "com.github.spotbugs" version "6.5.1"
+    id "com.github.spotbugs" version "6.5.5"
     id 'com.gradleup.shadow' version '9.4.1'
     id 'java'
 }
 
 group = "fr.sukikui.biomemap"
-version = "0.1.4"
+version = "0.1.5"
 
-def paperApiVersion = '1.21.11-R0.1-SNAPSHOT'
-def hyphenIndex = paperApiVersion.indexOf('-')
-def minecraftVersion = hyphenIndex > 0 ? paperApiVersion.substring(0, hyphenIndex) : paperApiVersion
+def minecraftVersion = '26.1.2'
+def paperApiVersion = "${minecraftVersion}.build.65-stable"
+def spotbugsAnnotationsVersion = '4.9.8'
+def junitVersion = '6.1.0'
 def archiveVersionLabel = "${version}+mc${minecraftVersion}"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 repositories {
@@ -26,7 +30,6 @@ repositories {
         url = 'https://repo.papermc.io/repository/maven-public/'
         content {
             includeModule("io.papermc.paper", "paper-api")
-            includeModule("io.papermc", "paperlib")
             includeModule("net.md-5", "bungeecord-chat")
             includeGroup("io.papermc.adventure")
         }
@@ -45,14 +48,13 @@ repositories {
 
 dependencies {
     compileOnly "io.papermc.paper:paper-api:${paperApiVersion}"
-    compileOnly 'com.github.spotbugs:spotbugs-annotations:4.9.6'
-    implementation 'io.papermc:paperlib:1.0.8'
+    compileOnly "com.github.spotbugs:spotbugs-annotations:${spotbugsAnnotationsVersion}"
     implementation 'com.google.code.gson:gson:2.14.0'
     spotbugsPlugins 'com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0'
-    testCompileOnly 'com.github.spotbugs:spotbugs-annotations:4.9.6'
+    testCompileOnly "com.github.spotbugs:spotbugs-annotations:${spotbugsAnnotationsVersion}"
     testImplementation "io.papermc.paper:paper-api:${paperApiVersion}"
-    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.3'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.0.3'
+    testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher:${junitVersion}"
 }
 
 test {
@@ -73,7 +75,7 @@ processResources {
 }
 
 checkstyle {
-    toolVersion = '12.0.1'
+    toolVersion = '13.4.2'
     maxWarnings = 0
 }
 
@@ -103,7 +105,6 @@ shadowJar {
     archiveBaseName.set(rootProject.name)
     archiveVersion.set(archiveVersionLabel)
     archiveClassifier.set('')
-    relocate 'io.papermc.lib', 'shadow.io.papermc.paperlib'
     minimize()
 }
 

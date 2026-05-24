@@ -1,7 +1,6 @@
 package fr.sukikui.biomemap.export;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import io.papermc.lib.PaperLib;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -87,7 +86,7 @@ public final class ChunkSnapshotProvider {
   private CompletableFuture<ChunkSnapshot> loadSnapshot(int chunkX, int chunkZ) {
     chunkRequests.incrementAndGet();
     CompletableFuture<ChunkSnapshot> result = new CompletableFuture<>();
-    PaperLib.getChunkAtAsync(world, chunkX, chunkZ, true)
+    world.getChunkAtAsync(chunkX, chunkZ, true)
         .whenComplete((chunk, throwable) -> {
           if (throwable != null) {
             result.completeExceptionally(throwable);

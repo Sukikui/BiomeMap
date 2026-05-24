@@ -6,7 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Color palette for vanilla biome ids (Minecraft 1.21.11) used by preview rendering.
+ * Color palette for vanilla biome ids (Minecraft 26.1.2) used by preview rendering.
  */
 public final class BiomeColorPalette {
 
