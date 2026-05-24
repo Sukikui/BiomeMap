@@ -2,7 +2,6 @@ package fr.sukikui.biomemap;
 
 import fr.sukikui.biomemap.command.BiomeMapCommand;
 import fr.sukikui.biomemap.export.BiomeExporter;
-import io.papermc.lib.PaperLib;
 import java.io.File;
 import java.util.Objects;
 import java.util.logging.Logger;
@@ -23,7 +22,6 @@ public final class BiomeMap extends JavaPlugin {
 
   @Override
   public void onEnable() {
-    PaperLib.suggestPaper(this);
     ensureDataFolder();
     saveDefaultConfig();
     loadPerformanceSettings();

@@ -27,7 +27,7 @@ Then it samples biomes and writes:
 
 ## 🚀 Installation
 
-1. Install [PaperMC server](https://papermc.io/downloads/paper) with Java 21+
+1. Install [PaperMC server](https://papermc.io/downloads/paper) with Java 25+
 2. Download the latest `biomemap-x.x.x+mcx.x.x.jar` from the [releases page](https://github.com/Sukikui/BiomeMap/releases)
 3. Drop the jar into your server’s `plugins/` folder
 4. Restart the server or run `/reload confirm`

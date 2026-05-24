@@ -2,8 +2,8 @@ main: ${PACKAGE}.${NAME}
 name: ${NAME}
 version: "${VERSION}"
 api-version: "${API_VERSION}"
-author: AUTHOR
-description: DESCRIPTION
+author: ${AUTHOR}
+description: "${DESCRIPTION}"
 commands:
   biomemap:
     description: Export dominant biomes to JSON/PNG, check status, and stop the current export.
