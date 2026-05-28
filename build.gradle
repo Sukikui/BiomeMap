@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "fr.sukikui.biomemap"
-version = "0.1.4"
+version = "0.1.5"
 
 def minecraftVersion = '26.1.2'
 def paperApiVersion = "${minecraftVersion}.build.65-stable"
@@ -62,15 +62,17 @@ test {
 }
 
 processResources {
+    def resourceProperties = [
+            NAME: rootProject.name,
+            VERSION: project.version.toString(),
+            PACKAGE: rootProject.group.toString(),
+            AUTHOR: "Sukikui",
+            DESCRIPTION: "Lightweight PaperMC plugin exporting dominant biomes from a selected area to JSON",
+            API_VERSION: minecraftVersion
+    ]
+    inputs.properties(resourceProperties)
     filesMatching("**/plugin.yml") {
-        expand(
-                NAME: rootProject.name,
-                VERSION: version,
-                PACKAGE: rootProject.group.toString(),
-                AUTHOR: "Sukikui",
-                DESCRIPTION: "Lightweight PaperMC plugin exporting dominant biomes from a selected area to JSON",
-                API_VERSION: minecraftVersion
-        )
+        expand(resourceProperties)
     }
 }
 

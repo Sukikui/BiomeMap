@@ -3,6 +3,7 @@ package fr.sukikui.biomemap.command;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import fr.sukikui.biomemap.export.AsyncBiomeExportTask;
 import fr.sukikui.biomemap.export.BiomeExporter;
+import fr.sukikui.biomemap.util.GridMath;
 import fr.sukikui.biomemap.util.ProgressFormatter;
 import java.io.File;
 import java.nio.file.Path;
@@ -31,8 +32,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 @SuppressFBWarnings("EI_EXPOSE_REP2")
 public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
 
-  private static final int CHUNK_SIZE = 16;
-  private static final int MIN_CELL_SIZE = 8;
+  private static final int MIN_CELL_SIZE = 4;
   private static final String CHAT_PREFIX = "§8[§b§lBiomeMap§8] §r";
   private static final int PLAYER_STATUS_MAP_MAX_WIDTH = 28;
   private static final int PLAYER_STATUS_MAP_MAX_HEIGHT = 10;
@@ -173,14 +173,11 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
 
     long totalCells = (long) width * height;
     long totalChunks;
-    if (cellSize >= CHUNK_SIZE) {
-      int chunksPerCell = Math.max(1, cellSize / CHUNK_SIZE);
-      totalChunks = totalCells * (long) chunksPerCell * chunksPerCell;
-    } else {
-      int cellsPerChunk = CHUNK_SIZE / cellSize;
-      int chunkColumns = Math.max(1, (width + cellsPerChunk - 1) / cellsPerChunk);
-      int chunkRows = Math.max(1, (height + cellsPerChunk - 1) / cellsPerChunk);
-      totalChunks = (long) chunkColumns * chunkRows;
+    try {
+      totalChunks = GridMath.countChunksForGrid(originX, originZ, width, height, cellSize);
+    } catch (IllegalArgumentException ex) {
+      sendError(sender, "Selection is too large to export.");
+      return true;
     }
     notifyInfo(
         sender,
@@ -268,7 +265,7 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
       }
       return Collections.emptyList();
     } else if (args.length >= 6) {
-      return List.of("8", "16", "32", "64", "128", "256", "preview");
+      return List.of("4", "8", "16", "32", "64", "128", "256", "preview");
     }
     return Collections.emptyList();
   }
@@ -410,14 +407,18 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
     if (requestedSize <= MIN_CELL_SIZE) {
       return MIN_CELL_SIZE;
     }
-    if (requestedSize < CHUNK_SIZE) {
-      return CHUNK_SIZE;
+    if (requestedSize < GridMath.CHUNK_SIZE) {
+      int alignedSize = MIN_CELL_SIZE;
+      while (alignedSize < GridMath.CHUNK_SIZE && requestedSize > alignedSize) {
+        alignedSize *= 2;
+      }
+      return alignedSize;
     }
-    int remainder = requestedSize % CHUNK_SIZE;
+    int remainder = requestedSize % GridMath.CHUNK_SIZE;
     if (remainder == 0) {
       return requestedSize;
     }
-    return requestedSize + (CHUNK_SIZE - remainder);
+    return requestedSize + (GridMath.CHUNK_SIZE - remainder);
   }
 
   private void notifyInfo(CommandSender sender, String senderMessage, String logMessage) {
