@@ -4,6 +4,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import fr.sukikui.biomemap.export.BiomeExporter.BiomeCell;
 import fr.sukikui.biomemap.export.BiomeExporter.BiomeMapExport;
 import fr.sukikui.biomemap.export.BiomeExporter.Point;
+import fr.sukikui.biomemap.util.GridMath;
 import fr.sukikui.biomemap.util.ProgressFormatter;
 import java.io.File;
 import java.io.IOException;
@@ -42,7 +43,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 @SuppressFBWarnings("EI_EXPOSE_REP2")
 public final class AsyncBiomeExportTask extends BukkitRunnable {
 
-  private static final int CHUNK_SIZE = 16;
+  private static final int CHUNK_SIZE = GridMath.CHUNK_SIZE;
   private static final String CHAT_PREFIX = "§8[§b§lBiomeMap§8] §r";
   private static final long FIRST_PROGRESS_HEARTBEAT_MS = TimeUnit.SECONDS.toMillis(10);
   private static final long PROGRESS_HEARTBEAT_MS = TimeUnit.MINUTES.toMillis(5);
@@ -149,15 +150,10 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
     this.subChunkSampling = cellSize < CHUNK_SIZE;
     this.chunksPerCell = subChunkSampling ? 1 : Math.max(1, cellSize / CHUNK_SIZE);
     this.cellsPerChunk = subChunkSampling ? Math.max(1, CHUNK_SIZE / cellSize) : 1;
-    if (subChunkSampling) {
-      this.chunkColumns = Math.max(1, (width + cellsPerChunk - 1) / cellsPerChunk);
-      this.chunkRows = Math.max(1, (height + cellsPerChunk - 1) / cellsPerChunk);
-    } else {
-      this.chunkColumns = width * chunksPerCell;
-      this.chunkRows = height * chunksPerCell;
-    }
-    this.chunkStartX = Math.floorDiv(originX, CHUNK_SIZE);
-    this.chunkStartZ = Math.floorDiv(originZ, CHUNK_SIZE);
+    this.chunkColumns = GridMath.countChunksForCells(originX, width, cellSize);
+    this.chunkRows = GridMath.countChunksForCells(originZ, height, cellSize);
+    this.chunkStartX = GridMath.chunkStart(originX);
+    this.chunkStartZ = GridMath.chunkStart(originZ);
     this.chunkBiomes = new String[chunkColumns * chunkRows];
     this.totalChunks = chunkBiomes.length;
     this.chunkCompletedMap = new boolean[chunkBiomes.length];
