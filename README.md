@@ -17,7 +17,7 @@ Then it samples biomes and writes:
 ## ✨ Features
 
 - Rectangular selection defined by two coordinates (`/biomemap world x1 z1 x2 z2 [cellSize] [preview]`)
-- Cell size with chunk-friendly alignment (`8`, `16`, `32`, ...)
+- Cell size with chunk-friendly alignment (`4`, `8`, `16`, `32`, ...)
 - Chunk-based sampling to smooth biome transitions
 - Asynchronous processing with frequent progress updates (no server freeze)
 - One export at a time (global lock)
@@ -51,7 +51,7 @@ Only one export can run at a time.
 | `<world>` | Yes | World name, for example `world` or `world_nether`. |
 | `<x1> <z1>` | Yes | First corner of the area. |
 | `<x2> <z2>` | Yes | Opposite corner of the area. |
-| `[cellSize]` | No | Cell size in blocks. Default `16` (common values: `8`, `16`, `32`, `64`, ...). |
+| `[cellSize]` | No | Cell size in blocks. Default `16` (common values: `4`, `8`, `16`, `32`, `64`, ...). |
 | `[preview]` | No | Add `preview` to generate a PNG (`1 pixel = 1 cell`). |
 
 
@@ -122,7 +122,7 @@ Quick tuning guide:
 
 | Field | Type | Description |
 | --- | --- | --- |
-| `cellSize` | `number` | Cell size in blocks (minimum 8; values above that are aligned to the chunk grid). |
+| `cellSize` | `number` | Cell size in blocks (minimum 4; values above that are aligned to the chunk grid). |
 | `selectionMin/Max` | `object` | Raw coordinates provided in the command. |
 | `gridOrigin` | `object` | North-west corner of the grid (min X, min Z). |
 | `width`, `height` | `number` | Number of cells on the X and Z axes. |
