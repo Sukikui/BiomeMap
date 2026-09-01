@@ -13,7 +13,7 @@ version = "0.1.5"
 def minecraftVersion = '26.1.2'
 def paperApiVersion = "${minecraftVersion}.build.65-stable"
 def spotbugsAnnotationsVersion = '4.9.8'
-def junitVersion = '6.1.0'
+def junitVersion = '6.1.3'
 def archiveVersionLabel = "${version}+mc${minecraftVersion}"
 
 java {
