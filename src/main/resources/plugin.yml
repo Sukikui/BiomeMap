@@ -6,5 +6,10 @@ author: ${AUTHOR}
 description: "${DESCRIPTION}"
 commands:
   biomemap:
+    permission: biomemap.admin
     description: Export dominant biomes to JSON/PNG, check status, and stop the current export.
     usage: "/biomemap <world> <x1> <z1> <x2> <z2> [cellSize] [preview] | /biomemap status [map] | /biomemap stop"
+permissions:
+  biomemap.admin:
+    description: Allows administrators to export biome maps, view status, and stop exports.
+    default: op

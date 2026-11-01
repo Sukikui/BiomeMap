@@ -1,10 +1,13 @@
 package fr.sukikui.biomemap.command;
 
+import static fr.sukikui.biomemap.command.BiomeMapArguments.alignCellSize;
+import static fr.sukikui.biomemap.command.BiomeMapArguments.parseInteger;
+import static fr.sukikui.biomemap.command.BiomeMapArguments.parsePositiveInteger;
+
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import fr.sukikui.biomemap.export.AsyncBiomeExportTask;
 import fr.sukikui.biomemap.export.BiomeExporter;
 import fr.sukikui.biomemap.util.GridMath;
-import fr.sukikui.biomemap.util.ProgressFormatter;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -32,12 +35,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 @SuppressFBWarnings("EI_EXPOSE_REP2")
 public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
 
-  private static final int MIN_CELL_SIZE = 4;
+  static final String ADMIN_PERMISSION = "biomemap.admin";
   private static final String CHAT_PREFIX = "§8[§b§lBiomeMap§8] §r";
-  private static final int PLAYER_STATUS_MAP_MAX_WIDTH = 28;
-  private static final int PLAYER_STATUS_MAP_MAX_HEIGHT = 10;
-  private static final int CONSOLE_STATUS_MAP_MAX_WIDTH = 56;
-  private static final int CONSOLE_STATUS_MAP_MAX_HEIGHT = 18;
 
   private final JavaPlugin plugin;
   private final BiomeExporter exporter;
@@ -78,6 +77,10 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
    */
   @Override
   public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    if (!sender.hasPermission(ADMIN_PERMISSION)) {
+      sendError(sender, "You do not have permission to use BiomeMap.");
+      return true;
+    }
     if (args.length >= 1 && "status".equalsIgnoreCase(args[0])) {
       return handleStatusCommand(sender, args);
     }
@@ -242,32 +245,10 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
   @Override
   public List<String> onTabComplete(
       CommandSender sender, Command command, String alias, String[] args) {
-    if (args.length == 1) {
-      String prefix = args[0].toLowerCase(Locale.ROOT);
-      List<String> suggestions = new ArrayList<>();
-      if ("status".startsWith(prefix)) {
-        suggestions.add("status");
-      }
-      if ("stop".startsWith(prefix)) {
-        suggestions.add("stop");
-      }
-      for (World world : Bukkit.getWorlds()) {
-        String name = world.getName();
-        if (name.toLowerCase(Locale.ROOT).startsWith(prefix)) {
-          suggestions.add(name);
-        }
-      }
-      return suggestions;
-    } else if (args.length == 2 && "status".equalsIgnoreCase(args[0])) {
-      String prefix = args[1].toLowerCase(Locale.ROOT);
-      if ("map".startsWith(prefix)) {
-        return List.of("map");
-      }
+    if (!sender.hasPermission(ADMIN_PERMISSION)) {
       return Collections.emptyList();
-    } else if (args.length >= 6) {
-      return List.of("4", "8", "16", "32", "64", "128", "256", "preview");
     }
-    return Collections.emptyList();
+    return BiomeMapSuggestions.complete(args);
   }
 
   /**
@@ -316,109 +297,9 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
     }
 
     AsyncBiomeExportTask task = runningExports.values().iterator().next();
-    AsyncBiomeExportTask.ExportStatus status = task.snapshotStatus();
-
-    sendInfo(sender, "§b§lExport status§7 (running)");
-    sendInfo(
-        sender,
-        String.format(
-            Locale.ROOT,
-            "World=§f%s§7 cell=§f%d§7 preview=§f%s",
-            status.worldName(),
-            status.cellSize(),
-            status.previewEnabled() ? "on" : "off"));
-    sendInfo(
-        sender,
-        String.format(
-            Locale.ROOT,
-            "Area=§f[%d,%d -> %d,%d]§7 grid=§f%dx%d§7 cells=§f%d",
-            status.selectionMinX(),
-            status.selectionMinZ(),
-            status.selectionMaxX(),
-            status.selectionMaxZ(),
-            status.gridWidth(),
-            status.gridHeight(),
-            status.totalCells()));
-
-    sendInfo(
-        sender,
-        ProgressFormatter.formatChatLine(
-            status.progressPercent(),
-            status.completedChunks(),
-            status.totalChunks(),
-            status.elapsedMs(),
-            status.etaMs(),
-            ProgressFormatter.DEFAULT_BAR_WIDTH));
-
-    if (status.initiatorName() != null && !status.initiatorName().isBlank()) {
-      String initiatorState = status.initiatorOnline() ? "online" : "offline";
-      sendInfo(
-          sender,
-          String.format(
-              Locale.ROOT,
-              "Initiator=§f%s§7 (%s)",
-              status.initiatorName(),
-              initiatorState));
-    }
-
-    sendInfo(sender, "JSON=§f" + status.jsonPath());
-    if (status.previewPath() != null) {
-      sendInfo(sender, "PNG=§f" + status.previewPath());
-    }
-
-    if (showMap) {
-      int maxWidth =
-          isConsoleSender(sender) ? CONSOLE_STATUS_MAP_MAX_WIDTH : PLAYER_STATUS_MAP_MAX_WIDTH;
-      int maxHeight =
-          isConsoleSender(sender) ? CONSOLE_STATUS_MAP_MAX_HEIGHT : PLAYER_STATUS_MAP_MAX_HEIGHT;
-      sendInfo(
-          sender,
-          String.format(
-              Locale.ROOT,
-              "Selection map (§f%d×%d§7 chunks, compact view):",
-              status.mapWidth(),
-              status.mapHeight()));
-      for (String line : task.renderProgressAsciiMap(maxWidth, maxHeight)) {
-        sendInfo(sender, "§f" + line);
-      }
-    } else {
-      sendInfo(sender, "Tip: run §f/biomemap status map§7 for ASCII map.");
-    }
+    BiomeMapStatusDisplay.show(task, showMap, isConsoleSender(sender),
+        message -> sendInfo(sender, message));
     return true;
-  }
-
-  private Integer parseInteger(String raw) {
-    try {
-      return Integer.parseInt(raw);
-    } catch (NumberFormatException ex) {
-      return null;
-    }
-  }
-
-  private Integer parsePositiveInteger(String raw) {
-    Integer value = parseInteger(raw);
-    if (value == null || value <= 0) {
-      return null;
-    }
-    return value;
-  }
-
-  private int alignCellSize(int requestedSize) {
-    if (requestedSize <= MIN_CELL_SIZE) {
-      return MIN_CELL_SIZE;
-    }
-    if (requestedSize < GridMath.CHUNK_SIZE) {
-      int alignedSize = MIN_CELL_SIZE;
-      while (alignedSize < GridMath.CHUNK_SIZE && requestedSize > alignedSize) {
-        alignedSize *= 2;
-      }
-      return alignedSize;
-    }
-    int remainder = requestedSize % GridMath.CHUNK_SIZE;
-    if (remainder == 0) {
-      return requestedSize;
-    }
-    return requestedSize + (GridMath.CHUNK_SIZE - remainder);
   }
 
   private void notifyInfo(CommandSender sender, String senderMessage, String logMessage) {
