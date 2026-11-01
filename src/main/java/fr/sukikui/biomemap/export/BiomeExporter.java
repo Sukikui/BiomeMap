@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -56,7 +57,9 @@ public final class BiomeExporter {
       if (!candidate.startsWith(basePath)) {
         throw new IllegalArgumentException("Selection output escaped exports directory");
       }
-      if (!candidate.toFile().exists()) {
+      if (!Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)
+          && !Files.exists(resolvePreviewOutput(candidate.toFile()).toPath(),
+              LinkOption.NOFOLLOW_LINKS)) {
         return candidate.toFile();
       }
     }

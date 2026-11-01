@@ -72,8 +72,10 @@ All files are written to `plugins/BiomeMap/exports/`.
 | PNG | `<world>_<cellSize>_<index>.png` | Only if `preview` is used |
 
 Rules:
-- `index` starts at `1` and increases if the filename already exists.
+- `index` starts at `1` and increases if either the JSON or PNG filename already exists.
 - If you run `/biomemap stop`, files from the canceled export are removed.
+- Files are staged as `.biomemap-*.tmp` files, then published complete without overwriting existing files. The export filesystem must support hard links.
+- PNG is published before JSON; the pair is not atomic. A crash may leave temporary files or an orphaned complete PNG.
 
 ## ⚙️ Configuration
 
