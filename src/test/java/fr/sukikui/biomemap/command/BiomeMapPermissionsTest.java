@@ -3,6 +3,8 @@ package fr.sukikui.biomemap.command;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import fr.sukikui.biomemap.export.ExportSettings;
+import fr.sukikui.biomemap.export.MissingChunkPolicy;
 import java.io.InputStream;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
@@ -28,7 +30,8 @@ class BiomeMapPermissionsTest {
   };
 
   private final BiomeMapCommand handler = new BiomeMapCommand(
-      null, null, Logger.getLogger("BiomeMapPermissionsTest"), 16, 1, 4, 64);
+      null, null, Logger.getLogger("BiomeMapPermissionsTest"), 16,
+      new ExportSettings(1, 4, MissingChunkPolicy.GENERATE));
 
   static Stream<List<String>> commandArguments() {
     return Stream.of(

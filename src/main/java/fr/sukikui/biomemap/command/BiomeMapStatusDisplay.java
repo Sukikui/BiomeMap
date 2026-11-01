@@ -20,6 +20,8 @@ final class BiomeMapStatusDisplay {
       AsyncBiomeExportTask task, boolean showMap, boolean console, Consumer<String> sendInfo) {
     AsyncBiomeExportTask.ExportStatus status = task.snapshotStatus();
     sendInfo.accept("§b§lExport status§7 (running)");
+    sendInfo.accept("Phase=§f" + status.phase() + "§7 missing-chunks=§f"
+        + status.missingChunkPolicy() + "§7 missing=§f" + status.missingChunks());
     sendInfo.accept(String.format(
         Locale.ROOT,
         "World=§f%s§7 cell=§f%d§7 preview=§f%s",

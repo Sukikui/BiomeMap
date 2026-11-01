@@ -1,7 +1,11 @@
 performance:
   # Maximum number of chunks scheduled per tick when exporting (>=1).
-  chunks-per-tick: 1
-  # Number of chunks that may be sampled concurrently (must be >= chunks-per-tick).
-  max-in-flight: 4
-  # Global server-side cap for chunks being loaded (IO throttle).
-  max-concurrent-chunks: 64
+  chunks-per-tick: 4
+  # Maximum unfinished chunk jobs, including loading, snapshots, and result processing (>=1).
+  max-in-flight: 16
+
+export:
+  # error: check the full aligned grid first; reject at the first ungenerated chunk.
+  # unknown: do not generate missing terrain; affected cells become minecraft:unknown.
+  # generate: generate missing chunks to export the complete selection (existing behavior).
+  missing-chunks: error

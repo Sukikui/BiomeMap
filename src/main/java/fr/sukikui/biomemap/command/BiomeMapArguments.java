@@ -41,6 +41,10 @@ final class BiomeMapArguments {
     if (remainder == 0) {
       return requestedSize;
     }
-    return requestedSize + (GridMath.CHUNK_SIZE - remainder);
+    long aligned = (long) requestedSize + GridMath.CHUNK_SIZE - remainder;
+    if (aligned > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("Cell size is too large to align to the chunk grid.");
+    }
+    return (int) aligned;
   }
 }
