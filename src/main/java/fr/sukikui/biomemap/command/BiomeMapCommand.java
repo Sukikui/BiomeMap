@@ -7,9 +7,10 @@ import static fr.sukikui.biomemap.command.BiomeMapArguments.parsePositiveInteger
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import fr.sukikui.biomemap.export.AsyncBiomeExportTask;
 import fr.sukikui.biomemap.export.BiomeExporter;
-import fr.sukikui.biomemap.util.GridMath;
+import fr.sukikui.biomemap.export.ExportGrid;
+import fr.sukikui.biomemap.export.ExportSettings;
+import fr.sukikui.biomemap.util.LogPaths;
 import java.io.File;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -42,9 +43,7 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
   private final BiomeExporter exporter;
   private final Logger logger;
   private final int defaultCellSize;
-  private final int chunksPerTick;
-  private final int maxInFlight;
-  private final int maxConcurrentChunks;
+  private final ExportSettings settings;
   private final Map<String, AsyncBiomeExportTask> runningExports = new HashMap<>();
 
   /**
@@ -60,16 +59,12 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
       BiomeExporter exporter,
       Logger logger,
       int defaultCellSize,
-      int chunksPerTick,
-      int maxInFlight,
-      int maxConcurrentChunks) {
+      ExportSettings settings) {
     this.plugin = plugin;
     this.exporter = exporter;
     this.logger = logger;
     this.defaultCellSize = defaultCellSize;
-    this.chunksPerTick = chunksPerTick;
-    this.maxInFlight = maxInFlight;
-    this.maxConcurrentChunks = maxConcurrentChunks;
+    this.settings = settings;
   }
 
   /**
@@ -135,7 +130,13 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
       return true;
     }
 
-    int alignedCellSize = alignCellSize(cellSize);
+    int alignedCellSize;
+    try {
+      alignedCellSize = alignCellSize(cellSize);
+    } catch (IllegalArgumentException ex) {
+      sendError(sender, ex.getMessage());
+      return true;
+    }
     if (alignedCellSize != cellSize) {
       sendWarning(sender, String.format(
           Locale.ROOT,
@@ -150,38 +151,22 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
       sendWarning(sender, "Use /biomemap stop before starting a new export.");
       return true;
     }
-    int selectionMinX = Math.min(x1, x2);
-    int selectionMinZ = Math.min(z1, z2);
-    int selectionMaxX = Math.max(x1, x2);
-    int selectionMaxZ = Math.max(z1, z2);
-
-    int chunkAlignedSize = cellSize;
-    int chunkMinX = Math.floorDiv(selectionMinX, chunkAlignedSize);
-    int chunkMaxX = Math.floorDiv(selectionMaxX, chunkAlignedSize);
-    int chunkMinZ = Math.floorDiv(selectionMinZ, chunkAlignedSize);
-    int chunkMaxZ = Math.floorDiv(selectionMaxZ, chunkAlignedSize);
-
-    int width = chunkMaxX - chunkMinX + 1;
-    int height = chunkMaxZ - chunkMinZ + 1;
-    if (width <= 0 || height <= 0) {
-      sendError(sender, "Invalid selection: zero-area bounding box.");
-      return true;
-    }
-
-    final int originX = chunkMinX * cellSize;
-    final int originZ = chunkMinZ * cellSize;
-
-    final File selectionOutputFile = exporter.resolveSelectionOutput(
-        world.getName(), cellSize);
-
-    long totalCells = (long) width * height;
-    long totalChunks;
+    ExportGrid grid;
     try {
-      totalChunks = GridMath.countChunksForGrid(originX, originZ, width, height, cellSize);
+      grid = ExportGrid.fromSelection(x1, z1, x2, z2, cellSize);
     } catch (IllegalArgumentException ex) {
-      sendError(sender, "Selection is too large to export.");
+      sendError(sender, "Invalid selection: " + ex.getMessage());
       return true;
     }
+    int width = grid.width();
+    int height = grid.height();
+    int selectionMinX = grid.selectionMin().x();
+    int selectionMinZ = grid.selectionMin().z();
+    int selectionMaxX = grid.selectionMax().x();
+    int selectionMaxZ = grid.selectionMax().z();
+    long totalCells = grid.totalCells();
+    long totalChunks = grid.totalChunks();
+    File selectionOutputFile = exporter.resolveSelectionOutput(world.getName(), cellSize);
     notifyInfo(
         sender,
         String.format(
@@ -203,13 +188,13 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
         sender,
         String.format(
             Locale.ROOT,
-            "§a§lExport started§7 for '§f%s§7' (cell=§f%d§7, preview=§f%s§7).",
+            "§a§lExport queued§7 for '§f%s§7' (cell=§f%d§7, preview=§f%s§7).",
             world.getName(),
             cellSize,
             previewMode),
         String.format(
             Locale.ROOT,
-            "Export started: world=%s area=[%d,%d -> %d,%d] cell=%d grid=%dx%d "
+            "Export queued: world=%s area=[%d,%d -> %d,%d] cell=%d grid=%dx%d "
                 + "cells=%d chunks~%d preview=%s output=%s",
             world.getName(),
             selectionMinX,
@@ -228,12 +213,9 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
     Runnable completion = () -> runningExports.remove(worldKey);
     UUID senderPlayerId = sender instanceof Player player ? player.getUniqueId() : null;
     AsyncBiomeExportTask task =
-        new AsyncBiomeExportTask(plugin, exporter, world, cellSize, width, height,
-            originX, originZ, selectionMinX, selectionMinZ, selectionMaxX, selectionMaxZ,
+        new AsyncBiomeExportTask(plugin, exporter, world, grid,
             selectionOutputFile, previewEnabled, sender, senderPlayerId, logger, completion,
-            chunksPerTick,
-            maxInFlight,
-            maxConcurrentChunks);
+            settings.chunksPerTick(), settings.maxInFlight(), settings.missingChunks());
     runningExports.put(worldKey, task);
     task.runTaskTimer(plugin, 1L, 1L);
     return true;
@@ -273,7 +255,8 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
     for (AsyncBiomeExportTask task : new ArrayList<>(runningExports.values())) {
       task.cancelAndCleanup();
     }
-    sendWarning(sender, "Stopped running export. Temporary output files removed.");
+    sendWarning(sender,
+        "Stop requested. Any output files will be removed before the export is unlocked.");
     return true;
   }
 
@@ -328,16 +311,6 @@ public final class BiomeMapCommand implements CommandExecutor, TabCompleter {
   }
 
   private String toLogPath(File file) {
-    Path absolute = file.toPath().toAbsolutePath().normalize();
-    Path serverRoot = plugin.getServer().getWorldContainer().toPath().toAbsolutePath().normalize();
-    Path rootParent = serverRoot.getParent();
-    if (rootParent != null && absolute.startsWith(rootParent)) {
-      return rootParent.relativize(absolute).toString().replace('\\', '/');
-    }
-    if (absolute.startsWith(serverRoot)) {
-      String relative = serverRoot.relativize(absolute).toString().replace('\\', '/');
-      return serverRoot.getFileName() + "/" + relative;
-    }
-    return absolute.toString().replace('\\', '/');
+    return LogPaths.format(file, plugin.getServer().getWorldContainer());
   }
 }

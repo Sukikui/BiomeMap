@@ -77,18 +77,29 @@ Rules:
 
 ## ⚙️ Configuration
 
-[`config.yml`](src/main/resources/config.yml) exposes performance throttles.
+[`config.yml`](src/main/resources/config.yml) exposes performance throttles and missing-terrain handling.
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `performance.chunks-per-tick` | `1` | How many new chunk jobs are started each tick. Lower = safer, slower. |
-| `performance.max-in-flight` | `4` | Max number of BiomeMap jobs currently in pipeline (queued/running). |
-| `performance.max-concurrent-chunks` | `64` | Max real chunk loads at the same time (main server pressure knob). |
+| `performance.chunks-per-tick` | `4` | How many new chunk jobs are started each tick. Lower = safer, slower. |
+| `performance.max-in-flight` | `16` | Max number of BiomeMap jobs currently in pipeline (queued/running). |
+| `export.missing-chunks` | `error` | `error`: reject before exporting if any required chunk is ungenerated. `unknown`: mark affected cells as `minecraft:unknown` (magenta in PNG). `generate`: generate missing terrain. |
 
 Quick tuning guide:
-- If players feel lag, lower `max-concurrent-chunks` first.
+- If players feel lag, lower `max-in-flight` or `chunks-per-tick`.
 - If export feels too slow but server is stable, increase `chunks-per-tick` a bit.
-- Keep `max-in-flight >= chunks-per-tick`.
+- `max-in-flight` remains the concurrency cap even if `chunks-per-tick` is higher.
+
+Older configurations may still contain `performance.max-concurrent-chunks`. During migration,
+the smaller of the old and new concurrency caps is used, with a warning in the server log.
+Set `max-in-flight` to that effective value and remove the old key.
+
+The `error` mode verifies chunks progressively; use `/biomemap status [map]` to monitor it
+or `/biomemap stop` to cancel. Restart the server after changing configuration.
+
+Selections whose aligned coordinates or backing array sizes cannot be represented are rejected
+before allocation or chunk loading. There are no configurable size caps: a very large valid
+selection can still exceed the server's available memory.
 
 ## 🗺 JSON Format
 
