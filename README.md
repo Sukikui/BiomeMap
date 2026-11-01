@@ -36,6 +36,9 @@ Then it samples biomes and writes:
 
 Only one export can run at a time.
 
+All commands and tab completion require `biomemap.admin`, granted to server operators
+and the console by default. A permissions plugin can grant or revoke this administrator permission.
+
 ### Commands
 
 | Command | Description |
