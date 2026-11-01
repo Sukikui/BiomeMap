@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -29,6 +30,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class AsyncBiomeExportTaskTest {
 
@@ -39,9 +42,10 @@ class AsyncBiomeExportTaskTest {
   private final List<String> messages = new ArrayList<>();
   private final List<LogRecord> logs = new ArrayList<>();
   private final Logger logger = Logger.getAnonymousLogger();
+  private final AtomicBoolean pluginEnabled = new AtomicBoolean(true);
   private final Plugin plugin = TestProxy.create(Plugin.class, (proxy, method, args) ->
       switch (method.getName()) {
-        case "isEnabled" -> true;
+        case "isEnabled" -> pluginEnabled.get();
         case "getServer" -> SERVER.server();
         case "getName" -> "BiomeMap";
         default -> throw new AssertionError("Unexpected plugin call: " + method.getName());
@@ -225,6 +229,34 @@ class AsyncBiomeExportTaskTest {
     assertEquals(1, finished.get());
     assertEquals(3, loads.size());
     assertFalse(Files.exists(output()));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void stopOrDisableAfterPublicationBeforeCallbackRollsBackOutputs(boolean disable)
+      throws Exception {
+    final AsyncBiomeExportTask task = start(loadingWorld(new AtomicInteger(), false, null),
+        MissingChunkPolicy.UNKNOWN, 4, 4, 16, 0);
+    SERVER.tick();
+    SERVER.tick();
+    long deadline = System.nanoTime() + 5_000_000_000L;
+    while (!Files.exists(output()) && System.nanoTime() < deadline) {
+      Thread.sleep(1);
+    }
+    assertTrue(Files.exists(output()));
+    assertEquals(0, finished.get());
+    pluginEnabled.set(!disable);
+    task.cancelAndCleanup();
+    awaitFinished();
+    while (Files.exists(output()) && System.nanoTime() < deadline) {
+      Thread.sleep(1);
+    }
+    assertFalse(Files.exists(output()));
+    assertFalse(Files.exists(directory.resolve("map.png")));
+    assertTrue(messages.stream().noneMatch(message -> message.contains("Export complete")));
+    try (var files = Files.list(directory)) {
+      assertEquals(0, files.count());
+    }
   }
 
   private AsyncBiomeExportTask start(

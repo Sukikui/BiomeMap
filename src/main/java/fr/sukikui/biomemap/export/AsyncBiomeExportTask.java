@@ -204,7 +204,7 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
         files.cleanup();
         logger.log(Level.SEVERE, "Failed to write biome export", error);
         feedback.error("Failed to write biome export: " + error.getMessage());
-      } else {
+      } else if (files.commit()) {
         feedback.complete(grid, files, System.currentTimeMillis() - startedAt,
             snapshots.getRequestedSnapshots(), missingChunks.get());
       }
@@ -216,6 +216,7 @@ public final class AsyncBiomeExportTask extends BukkitRunnable {
   /** Cancels preflight or sampling immediately; an active writer finishes cleanup before unlock. */
   public void cancelAndCleanup() {
     stopped.set(true);
+    files.cleanup();
     cancel();
     if (!"finalizing".equals(phase) || !plugin.isEnabled()) {
       finishTask();
